@@ -45,10 +45,11 @@ class StoryboardAgent:
         if len(storyboard.panels) != expected_count:
             raise ValueError(f"expected {expected_count} memory illustrations, got {len(storyboard.panels)}")
 
-        compact_source = re.sub(r"\s+", "", transcript)
-        compact_diary = re.sub(r"\s+", "", storyboard.organized_diary)
-        if not compact_diary or len(compact_diary) < max(5, int(len(compact_source) * 0.55)):
-            storyboard.organized_diary = transcript.strip()
+        # A fluent provider rewrite can keep the broad topic while silently
+        # adding concrete actions, objects, or feelings. Length/excerpt checks
+        # cannot prove those additions came from the user, so only the source
+        # transcript is safe to persist as the diary body.
+        storyboard.organized_diary = transcript.strip()
 
         source_sentences = self._sentences(transcript)
         diary_sentences = self._sentences(storyboard.organized_diary)

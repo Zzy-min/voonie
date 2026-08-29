@@ -116,6 +116,31 @@ def test_reflective_today_question_retrieves_diary_context():
     assert "终于把项目做完了" in provider.last_prompt
 
 
+def test_today_diary_is_explicitly_labelled_and_cannot_be_called_yesterday():
+    provider = InspectingProvider()
+    agent = PetCompanionAgent(provider=provider)
+
+    asyncio.run(
+        agent.chat(
+            message="我今天为什么最后觉得很温暖？",
+            user_nickname="小夏",
+            time_context="2026年08月30日 星期日 晚上 20:30",
+            today_date="2026-08-30",
+            recent_diaries=[
+                {
+                    "date": "2026-08-30",
+                    "title": "晚霞里的温暖一天",
+                    "text": "傍晚骑车回家看见橙色晚霞，觉得很温暖。",
+                    "emotion": "治愈 (8/10)",
+                }
+            ],
+        )
+    )
+
+    assert "[2026-08-30（今天）]" in provider.last_prompt
+    assert "今天的日记不得称为“昨天”" in provider.last_prompt
+
+
 def test_pet_chat_stream_emits_tokens_then_action():
     app = create_app(Settings(
         DATABASE_URL="sqlite+aiosqlite:///:memory:",

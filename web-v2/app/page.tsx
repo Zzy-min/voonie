@@ -805,7 +805,12 @@ function StoryBook({
   return (
     <section className="workspace flow-workspace story-workspace">
       <header className="flow-topbar">
-        <button className="flow-back-btn" onClick={onBack} aria-label="重新创作">
+        <button
+          className="flow-back-btn"
+          type="button"
+          onClick={onBack}
+          aria-label="重新创作"
+        >
           <ArrowLeft size={16} />
           <span>重新创作</span>
         </button>
@@ -854,7 +859,12 @@ function StoryBook({
               </div>
             </>
           ) : null}
-          <button className="save-story-btn-top" onClick={onHome} aria-label="保存并返回">
+          <button
+            className="save-story-btn-top"
+            type="button"
+            onClick={onHome}
+            aria-label="保存并返回"
+          >
             <Save size={16} />
             <span className="save-label-desktop">保存并返回</span>
             <span className="save-label-mobile">完成</span>
@@ -1357,6 +1367,11 @@ export default function HomePage() {
     recorderRef.current = null;
     setRecording(false);
     setRecordingSeconds(0);
+    if (discard) {
+      setDiaryText(speechBaseTextRef.current);
+      speechFinalTextRef.current = "";
+      speechRecognizedRef.current = false;
+    }
     if (generating) {
       void cancelGeneration();
     }

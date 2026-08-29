@@ -61,6 +61,11 @@ test("voice recording exposes live status, finish, and cancel controls", async (
   assert.match(source, /MediaRecorder\.isTypeSupported/);
   assert.match(source, /audioBitsPerSecond:\s*48_000/);
   assert.match(source, /new MediaRecorder\(stream, recorderOptions\)/);
+  assert.match(
+    source,
+    /if \(discard\) \{[\s\S]*setDiaryText\(speechBaseTextRef\.current\)/,
+    "cancelling a recording must restore the text that existed before recognition started",
+  );
 });
 
 test("illustrated diary keeps one reading flow and anchors images to diary text", async () => {
@@ -132,8 +137,11 @@ test("mobile journal header keeps destructive actions in an overflow menu", asyn
   assert.match(source, /aria-expanded=\{storyMenuOpen\}/);
   assert.match(source, /className="story-action-menu"/);
   assert.match(source, /save-label-mobile[^>]*>完成<\/span>/);
+  assert.match(source, /className="flow-back-btn"[^>]*type="button"/);
+  assert.match(source, /className="save-story-btn-top"[^>]*type="button"/);
   assert.match(css, /\.story-workspace \.delete-story-btn-top\s*\{[^}]*display:\s*none/s);
   assert.match(css, /\.story-action-menu\s*\{[^}]*position:\s*absolute/s);
+  assert.match(css, /\.story-workspace \.flow-topbar\s*\{[^}]*max-width:\s*100vw/s);
 });
 
 test("emits Voonie's responsive flow and loading styles", async () => {

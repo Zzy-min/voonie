@@ -137,6 +137,7 @@ async def chat_with_pet(
         user_quote=user_quote,
         user_quote_note=user_quote_note,
         time_context=time_context,
+        today_date=now_cn.date().isoformat(),
         total_diaries_count=total_diaries,
         recent_diaries=recent_diaries_list,
         history=history_list,

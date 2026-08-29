@@ -1,3 +1,4 @@
+from datetime import date, timedelta
 from typing import Any, List, Optional
 from voonie.backend.app.core.config import Settings, settings
 from voonie.backend.app.models.schemas import MemoryContextItem, PetChatResponse
@@ -67,6 +68,21 @@ class PetCompanionAgent:
     ) -> None:
         self.provider = provider or get_pet_llm_provider(app_settings)
 
+    @staticmethod
+    def _label_memory_date(value: str, today_date: str) -> str:
+        if not value or not today_date:
+            return value
+        try:
+            memory_day = date.fromisoformat(value)
+            current_day = date.fromisoformat(today_date)
+        except ValueError:
+            return value
+        if memory_day == current_day:
+            return f"{value}（今天）"
+        if memory_day == current_day - timedelta(days=1):
+            return f"{value}（昨天）"
+        return value
+
     async def chat(
         self, 
         message: str, 
@@ -76,6 +92,7 @@ class PetCompanionAgent:
         user_quote: str = "",
         user_quote_note: str = "",
         time_context: str = "",
+        today_date: str = "",
         total_diaries_count: int = 0,
         recent_diaries: list[dict[str, Any]] | None = None,
         history: list[dict[str, str]] | None = None,
@@ -98,7 +115,7 @@ class PetCompanionAgent:
         snippets = []
         if has_memory_cues and recent_diaries:
             for d in recent_diaries[:5]:
-                date_str = d.get("date", "")
+                date_str = self._label_memory_date(d.get("date", ""), today_date)
                 title = d.get("title", "日记")
                 text = d.get("text", "")
                 emotion = d.get("emotion", "")
@@ -107,9 +124,11 @@ class PetCompanionAgent:
         if local_memory_context:
             for m in local_memory_context:
                 if isinstance(m, dict):
-                    snippets.append(f"- [{m.get('happened_date', '')}] 《{m.get('title', '')}》: {m.get('summary', '')} (心情: {m.get('emotion', '')})")
+                    memory_date = self._label_memory_date(m.get("happened_date", ""), today_date)
+                    snippets.append(f"- [{memory_date}] 《{m.get('title', '')}》: {m.get('summary', '')} (心情: {m.get('emotion', '')})")
                 else:
-                    snippets.append(f"- [{m.happened_date}] 《{m.title}》: {m.summary} (心情: {m.emotion})")
+                    memory_date = self._label_memory_date(m.happened_date, today_date)
+                    snippets.append(f"- [{memory_date}] 《{m.title}》: {m.summary} (心情: {m.emotion})")
 
         if snippets:
             context_str = "\n".join(snippets)
@@ -152,7 +171,8 @@ class PetCompanionAgent:
 1. 语言自然亲昵，自然称呼小主人（{user_nickname}）；
 2. 深度了解小主人的生活：当小主人聊到相关事情、心情、或者询问你是否知道/记得某些过去的事时，主动且贴心地联系上方的日记与生活回忆给予温暖回应与陪伴；
 3. 如果本轮回复中提及或引用了小主人的日记或生活回忆，请在 referenced_memories 中返回对应的日记标题或日期；如未提及过去日记，referenced_memories 返回空数组；
-4. 输出严格的 JSON 格式。
+4. 严格按照每条记录括号中的相对日期称呼：今天的日记不得称为“昨天”，昨天的日记不得称为“今天”；
+5. 输出严格的 JSON 格式。
 """
         parsed = await self.provider.complete_json(self.SYSTEM_PROMPT, user_input_prompt)
         response = PetChatResponse.model_validate(parsed)
