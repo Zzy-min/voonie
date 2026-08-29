@@ -140,6 +140,8 @@ def test_character_snapshot_survives_later_edits(mvp_client):
         "bible": {"hair": "brown bob", "outfit": "yellow hoodie", "locked": ["hairstyle", "main outfit color"]},
     })
     character_id = created.json()["id"]
+    listed = mvp_client.get("/api/v1/characters", headers=headers)
+    assert [item["id"] for item in listed.json()] == [character_id]
     upload = mvp_client.post(
         f"/api/v1/characters/{character_id}/references",
         headers=headers,
@@ -147,6 +149,7 @@ def test_character_snapshot_survives_later_edits(mvp_client):
         data={"kind": "front"},
     )
     assert upload.status_code == 201
+    reference_id = upload.json()["id"]
     entry_id = create_entry(mvp_client, headers, "char-entry", "今天把人物卡定下来了。", "2026-08-27T12:00:00Z")
     job = mvp_client.post(
         f"/api/v1/entries/{entry_id}/comic-jobs",
@@ -159,6 +162,9 @@ def test_character_snapshot_survives_later_edits(mvp_client):
     artifact = mvp_client.get(f"/api/v1/artifacts/{artifact_id}", headers=headers).json()
     assert "yellow hoodie" in artifact["character_snapshot"]["appearance_prompt"]
     assert "red coat" not in artifact["character_snapshot"]["appearance_prompt"]
+    assert mvp_client.delete(
+        f"/api/v1/characters/{character_id}/references/{reference_id}", headers=headers
+    ).status_code == 204
 
 
 def test_daily_storybook_versions_and_empty_day(mvp_client):

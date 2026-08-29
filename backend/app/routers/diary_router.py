@@ -82,6 +82,7 @@ def deprecate(response: Response) -> None:
 async def run_compat_job(
     request: Request, db: AsyncSession, user: User, payload: dict, key: str | None
 ) -> Job | JSONResponse:
+    user_id = user.id
     # Some legacy tests instantiate TestClient without entering its lifespan.
     if request.app.state.settings.TESTING:
         async with request.app.state.db_engine.begin() as connection:
@@ -90,19 +91,19 @@ async def run_compat_job(
             db.add(User(id=TEST_USER_ID, device_id="test-device"))
             await db.commit()
     if key:
-        existing = await db.scalar(select(Job).where(Job.user_id == user.id, Job.idempotency_key == key))
+        existing = await db.scalar(select(Job).where(Job.user_id == user_id, Job.idempotency_key == key))
         if existing is not None:
             if existing.status == "done":
                 return existing
             raise HTTPException(status_code=409, detail="An unfinished request already uses this idempotency key")
     await request.app.state.rate_limiter.consume(
         db,
-        user.id,
+        user_id,
         "comic",
         request.app.state.settings.COMIC_HOURLY_LIMIT,
         commit=False,
     )
-    job = Job(user_id=user.id, type="comic", request_json=payload, idempotency_key=key)
+    job = Job(user_id=user_id, type="comic", request_json=payload, idempotency_key=key)
     db.add(job)
     try:
         await db.commit()
@@ -110,7 +111,7 @@ async def run_compat_job(
         await db.rollback()
         if key is None:
             raise
-        existing = await db.scalar(select(Job).where(Job.user_id == user.id, Job.idempotency_key == key))
+        existing = await db.scalar(select(Job).where(Job.user_id == user_id, Job.idempotency_key == key))
         if existing is None:
             raise
         if existing.status == "done":
@@ -205,6 +206,13 @@ async def regenerate_panel(
     target_panel = next((p for p in panels if p.panel_no == panel_no), None)
     if target_panel is None:
         raise HTTPException(status_code=404, detail=f"Panel {panel_no} not found")
+
+    await request.app.state.rate_limiter.consume(
+        db,
+        current_user.id,
+        "comic",
+        request.app.state.settings.COMIC_HOURLY_LIMIT,
+    )
 
     storyboard_panel = ComicPanel.model_validate(target_panel.storyboard_json)
     if body and body.custom_prompt:

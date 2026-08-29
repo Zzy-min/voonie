@@ -52,27 +52,30 @@ async def chat_with_pet(
         )
     ) or 0
 
-    recent_artifacts = list(
-        (
-            await db.scalars(
-                select(DiaryArtifact)
-                .where(DiaryArtifact.user_id == current_user.id)
-                .order_by(DiaryArtifact.created_at.desc())
-                .limit(5)
-            )
-        ).all()
-    )
+    recent_artifacts: list[DiaryArtifact] = []
+    recent_entries: list[DiaryEntry] = []
+    if current_user.memory_opt_in:
+        recent_artifacts = list(
+            (
+                await db.scalars(
+                    select(DiaryArtifact)
+                    .where(DiaryArtifact.user_id == current_user.id)
+                    .order_by(DiaryArtifact.created_at.desc())
+                    .limit(5)
+                )
+            ).all()
+        )
 
-    recent_entries = list(
-        (
-            await db.scalars(
-                select(DiaryEntry)
-                .where(DiaryEntry.user_id == current_user.id)
-                .order_by(DiaryEntry.entry_date.desc())
-                .limit(5)
-            )
-        ).all()
-    )
+        recent_entries = list(
+            (
+                await db.scalars(
+                    select(DiaryEntry)
+                    .where(DiaryEntry.user_id == current_user.id)
+                    .order_by(DiaryEntry.entry_date.desc())
+                    .limit(5)
+                )
+            ).all()
+        )
 
     # 4. Format Recent Diary Data
     recent_diaries_list: list[dict[str, Any]] = []
@@ -116,7 +119,7 @@ async def chat_with_pet(
     # Client-supplied memory is intentionally ignored because it can be stale, cross-account,
     # or forged and must never be presented to the model as trusted diary history.
     context_items = []
-    if PetCompanionAgent.should_retrieve_memory(req.message):
+    if current_user.memory_opt_in and PetCompanionAgent.should_retrieve_memory(req.message):
         try:
             context_items = await request.app.state.memory_service.search(db, current_user.id, req.message, limit=5)
         except Exception:

@@ -456,11 +456,13 @@ export async function createComicJob(
   entryId: string,
   refImageB64?: string,
   stylePreset?: string,
+  idempotencyKey?: string,
 ) {
   return apiJson<{ job_id: string }>(
     "/api/v1/entries/" + entryId + "/comic-jobs",
     {
       method: "POST",
+      headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined,
       body: JSON.stringify({
         ref_image_b64: refImageB64 || undefined,
         character: stylePreset ? { style_preset: stylePreset } : undefined,

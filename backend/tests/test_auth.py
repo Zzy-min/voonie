@@ -5,6 +5,7 @@ import uuid
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
 from voonie.backend.app.core.config import Settings
 from voonie.backend.app.db.models import Base, User
@@ -212,6 +213,51 @@ def test_repeated_failed_logins_are_rate_limited_without_blocking_correct_passwo
     assert second.status_code == 401
     assert third.status_code == 429
     assert correct.status_code == 200
+
+
+def test_registration_normalizes_email_hashes_password_and_rejects_duplicates(auth_client):
+    password = "S3cure-密码-🌟"
+    first = auth_client.post("/api/v1/auth/register", json={
+        "email": "  Mixed.Case@Example.COM  ",
+        "password": password,
+        "confirm_password": password,
+        "nickname": "Unicode 用户",
+    })
+    duplicate = auth_client.post("/api/v1/auth/register", json={
+        "email": "mixed.case@example.com",
+        "password": "another-password",
+        "confirm_password": "another-password",
+    })
+
+    assert first.status_code == 201
+    assert first.json()["email"] == "mixed.case@example.com"
+    assert password not in first.text
+    assert duplicate.status_code == 409
+
+    async def stored_credentials():
+        async with auth_client.app.state.db_session_factory() as session:
+            user = await session.scalar(select(User).where(User.email == "mixed.case@example.com"))
+            return user.password_hash
+
+    password_hash = asyncio.run(stored_credentials())
+    assert password not in password_hash
+    assert password_hash
+
+
+@pytest.mark.parametrize(
+    ("payload", "expected_status"),
+    [
+        ({"email": "not-an-email", "password": "123456", "confirm_password": "123456"}, 422),
+        ({"email": "valid@example.com", "password": "12345", "confirm_password": "12345"}, 422),
+        ({"email": "valid@example.com", "password": "123456", "confirm_password": "different"}, 422),
+        ({"email": "", "password": "123456", "confirm_password": "123456"}, 422),
+        ({"email": "valid@example.com", "password": "", "confirm_password": ""}, 422),
+        ({"email": "a" * 247 + "@test.com", "password": "123456", "confirm_password": "123456"}, 422),
+    ],
+)
+def test_registration_boundaries(auth_client, payload, expected_status):
+    response = auth_client.post("/api/v1/auth/register", json=payload)
+    assert response.status_code == expected_status
 
 
 def test_production_settings_reject_insecure_or_mock_configuration():

@@ -75,6 +75,7 @@ import {
   mediaUrl,
   getCurrentUser,
   logoutUser,
+  newLocalId,
   type UserProfile,
 } from "@/lib/api";
 import { cancelJob } from "@/lib/api";
@@ -1229,6 +1230,7 @@ export default function HomePage() {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animFrameRef = useRef<number | null>(null);
   const generationAbortRef = useRef<AbortController | null>(null);
+  const generationInFlightRef = useRef(false);
   const activeJobRef = useRef<string | null>(null);
   const activeEntryRef = useRef<string | null>(null);
   const updateActiveJobId = (value: string | null) => {
@@ -1616,7 +1618,14 @@ export default function HomePage() {
     targetEntryId?: string,
   ) => {
     const textToUse = diaryText.trim() || currentStory?.rawTranscript || "";
-    if (!textToUse || requestingMicrophoneRef.current || recordingActiveRef.current) return;
+    if (
+      !textToUse ||
+      requestingMicrophoneRef.current ||
+      recordingActiveRef.current ||
+      generationInFlightRef.current
+    ) return;
+    generationInFlightRef.current = true;
+    const generationRequestId = newLocalId("comic-job");
     setRecording(false);
     setGenerating(true);
     setCreateError("");
@@ -1635,7 +1644,12 @@ export default function HomePage() {
         return;
       }
       setGeneratingHint("正在理解今天的情绪与重要片段…");
-      const queued = await createComicJob(entry.id, refImageB64, stylePreset);
+      const queued = await createComicJob(
+        entry.id,
+        refImageB64,
+        stylePreset,
+        generationRequestId,
+      );
       updateActiveJobId(queued.job_id);
       if (controller.signal.aborted) {
         await cancelJob(queued.job_id);
@@ -1690,6 +1704,7 @@ export default function HomePage() {
         error instanceof Error ? error.message : "生成失败，请稍后重试",
       );
     } finally {
+      generationInFlightRef.current = false;
       if (generationAbortRef.current === controller)
         generationAbortRef.current = null;
     }

@@ -288,3 +288,21 @@ def test_http_retry_does_not_retry_non_retryable_client_errors():
     with pytest.raises(httpx.HTTPStatusError):
         run(exercise())
     assert attempts == 1
+
+
+def test_http_retry_recovers_from_connection_reset_and_stays_bounded():
+    attempts = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        if attempts < 3:
+            raise httpx.ConnectError("connection reset", request=request)
+        return httpx.Response(200, request=request)
+
+    async def exercise():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            return await request_with_retry(client, "GET", "https://provider.test", attempts=3)
+
+    assert run(exercise()).status_code == 200
+    assert attempts == 3

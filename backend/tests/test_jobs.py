@@ -1,4 +1,5 @@
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import time
 import uuid
@@ -8,10 +9,11 @@ from fastapi.testclient import TestClient
 
 from voonie.backend.app.core.config import Settings
 from voonie.backend.app.db.models import Base
-from voonie.backend.app.db.models import DiaryArtifact, DiaryEntry, Panel
+from voonie.backend.app.db.models import DiaryArtifact, DiaryEntry, Job, Panel
 from sqlalchemy import func, select
 from voonie.backend.app.main import create_app
 from voonie.backend.app.services.image_gen_service import ImageGenService
+from voonie.backend.app.services.pet_agent import PetCompanionAgent
 
 
 @pytest.fixture
@@ -35,7 +37,13 @@ def jobs_client():
     asyncio.run(create_schema())
     with TestClient(app) as client:
         yield client
-    database_path.unlink()
+    asyncio.run(app.state.db_engine.dispose())
+    for _ in range(20):
+        try:
+            database_path.unlink(missing_ok=True)
+            break
+        except PermissionError:
+            time.sleep(0.05)
 
 
 def auth_headers(client: TestClient, device_id: str) -> dict[str, str]:
@@ -96,6 +104,60 @@ def test_job_status_is_isolated_by_user(jobs_client):
     assert response.status_code == 404
 
 
+def test_all_generated_diary_resources_are_isolated_by_user(jobs_client):
+    class PromptInspector:
+        def __init__(self):
+            self.prompt = ""
+
+        async def complete_json(self, _system: str, prompt: str) -> dict:
+            self.prompt = prompt
+            return {"reply": "没有找到足够的记录。", "pet_action": "think", "referenced_memories": []}
+
+    owner = auth_headers(jobs_client, "isolation-owner-001")
+    other = auth_headers(jobs_client, "isolation-other-001")
+    secret = "我的测试暗号是星星柠檬4729。"
+    created = jobs_client.post(
+        "/api/v1/jobs/comic",
+        headers=owner | {"Idempotency-Key": "isolation-owner-job"},
+        json={"text": f"今天记录一件私密小事，{secret}"},
+    )
+    completed = wait_for_job(jobs_client, created.json()["job_id"], owner)
+    assert completed["status"] == "done"
+    job_id = completed["job_id"]
+    entry_id = completed["result"]["entry_id"]
+    artifact_id = completed["result"]["artifact_id"]
+    media_path = "/media/" + completed["result"]["panels"][0]["image_url"].rsplit("/", 1)[-1]
+
+    checks = [
+        jobs_client.get(f"/api/v1/jobs/{job_id}", headers=other),
+        jobs_client.post(f"/api/v1/jobs/{job_id}/cancel", headers=other),
+        jobs_client.get(f"/api/v1/jobs/{job_id}/events", headers=other),
+        jobs_client.get(f"/api/v1/entries/{entry_id}", headers=other),
+        jobs_client.patch(f"/api/v1/entries/{entry_id}", headers=other, json={"text": "篡改"}),
+        jobs_client.delete(f"/api/v1/entries/{entry_id}", headers=other),
+        jobs_client.get(f"/api/v1/artifacts/{artifact_id}", headers=other),
+        jobs_client.post(f"/api/v1/artifacts/{artifact_id}/panels/1/retry", headers=other),
+        jobs_client.get(f"/api/v1/diaries/{job_id}", headers=other),
+        jobs_client.delete(f"/api/v1/diaries/{job_id}", headers=other),
+        jobs_client.post(f"/api/v1/diaries/{job_id}/panels/1/regenerate", headers=other),
+        jobs_client.get(media_path, headers=other),
+    ]
+    assert {response.status_code for response in checks} == {404}
+
+    inspector = PromptInspector()
+    jobs_client.app.state.pet_agent = PetCompanionAgent(provider=inspector)
+    chat = jobs_client.post(
+        "/api/v1/pet/chat",
+        headers=other,
+        json={"message": "我之前日记里的测试暗号是什么？"},
+    )
+    assert chat.status_code == 200
+    assert "星星柠檬4729" not in inspector.prompt
+
+    assert jobs_client.get(f"/api/v1/entries/{entry_id}", headers=owner).status_code == 200
+    assert jobs_client.get(f"/api/v1/artifacts/{artifact_id}", headers=owner).status_code == 200
+
+
 def test_idempotency_key_returns_existing_job(jobs_client):
     headers = auth_headers(jobs_client, "jobs-idempotency-001")
     headers["Idempotency-Key"] = "comic-request-001"
@@ -107,6 +169,31 @@ def test_idempotency_key_returns_existing_job(jobs_client):
     assert first.status_code == 202
     assert second.status_code == 202
     assert first.json()["job_id"] == second.json()["job_id"]
+
+
+def test_concurrent_duplicate_comic_requests_create_one_job(jobs_client):
+    headers = auth_headers(jobs_client, "jobs-concurrent-idempotency-001")
+    headers["Idempotency-Key"] = "comic-concurrent-request-001"
+    payload = {"text": "连续点击生成时，只允许创建一个付费任务。"}
+
+    def submit():
+        return jobs_client.post("/api/v1/jobs/comic", headers=headers, json=payload)
+
+    with ThreadPoolExecutor(max_workers=5) as pool:
+        responses = list(pool.map(lambda _index: submit(), range(5)))
+
+    assert {response.status_code for response in responses} == {202}
+    assert len({response.json()["job_id"] for response in responses}) == 1
+
+    async def job_count():
+        async with jobs_client.app.state.db_session_factory() as session:
+            return await session.scalar(
+                select(func.count()).select_from(Job).where(
+                    Job.idempotency_key == "comic-concurrent-request-001"
+                )
+            )
+
+    assert asyncio.run(job_count()) == 1
 
 
 def test_job_events_stream_terminal_event(jobs_client):

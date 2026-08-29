@@ -1,5 +1,5 @@
 from typing import List, Optional, Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 class EmotionSummary(BaseModel):
     primary_emotion: str = Field(description="主导情绪，如: joy, relaxed, anxious, sad, healing, excited")
@@ -88,20 +88,34 @@ class MemoryContextItem(BaseModel):
 
 class ChatHistoryItem(BaseModel):
     role: Literal["user", "assistant", "bot"]
-    content: str
+    content: str = Field(min_length=1, max_length=4000)
+
+    @field_validator("content")
+    @classmethod
+    def reject_blank_content(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("content cannot be blank")
+        return value
 
 class PetChatRequest(BaseModel):
-    message: str = Field(description="用户与宠物聊天的消息")
-    pet_name: str = "Voonie"
+    message: str = Field(min_length=1, max_length=4000, description="用户与宠物聊天的消息")
+    pet_name: str = Field(default="Voonie", min_length=1, max_length=32)
     pet_type: Literal["cat", "dog", "dino"] = "dog"
-    user_nickname: Optional[str] = None
-    history: Optional[List[ChatHistoryItem]] = Field(default=None, description="前几轮对话历史上下文")
+    user_nickname: Optional[str] = Field(default=None, max_length=32)
+    history: Optional[List[ChatHistoryItem]] = Field(default=None, max_length=20, description="前几轮对话历史上下文")
     local_memory_context: Optional[List[MemoryContextItem]] = Field(
         default=None, 
         description="Deprecated and ignored; history is retrieved from authenticated server-side data"
     )
-    recent_mood_trend: Optional[str] = None
+    recent_mood_trend: Optional[str] = Field(default=None, max_length=500)
     stream: bool = False
+
+    @field_validator("message")
+    @classmethod
+    def reject_blank_message(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("message cannot be blank")
+        return value
 
 class PetChatResponse(BaseModel):
     reply: str = Field(description="宠物的共情/回忆回复")

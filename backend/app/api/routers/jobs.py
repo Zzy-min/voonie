@@ -46,20 +46,24 @@ async def enqueue_comic_job(
     payload: dict,
     idempotency_key: str | None,
 ) -> JobQueuedResponse:
+    # Cache scalar identity before any rollback. SQLAlchemy expires ORM objects on
+    # rollback; dereferencing current_user.id afterwards can trigger async IO from
+    # the wrong context under a real idempotency race.
+    user_id = current_user.id
     if idempotency_key:
         existing = await db.scalar(
-            select(Job).where(Job.user_id == current_user.id, Job.idempotency_key == idempotency_key)
+            select(Job).where(Job.user_id == user_id, Job.idempotency_key == idempotency_key)
         )
         if existing is not None:
             return JobQueuedResponse(job_id=existing.id)
     await request.app.state.rate_limiter.consume(
         db,
-        current_user.id,
+        user_id,
         "comic",
         request.app.state.settings.COMIC_HOURLY_LIMIT,
         commit=False,
     )
-    job = Job(user_id=current_user.id, type="comic", request_json=payload, idempotency_key=idempotency_key)
+    job = Job(user_id=user_id, type="comic", request_json=payload, idempotency_key=idempotency_key)
     db.add(job)
     try:
         await db.commit()
@@ -68,7 +72,7 @@ async def enqueue_comic_job(
         if not idempotency_key:
             raise
         existing = await db.scalar(
-            select(Job).where(Job.user_id == current_user.id, Job.idempotency_key == idempotency_key)
+            select(Job).where(Job.user_id == user_id, Job.idempotency_key == idempotency_key)
         )
         if existing is None:
             raise

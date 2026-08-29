@@ -1,8 +1,10 @@
 import asyncio
+from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 
 from voonie.backend.app.core.config import Settings
+from voonie.backend.app.db.models import Base, DiaryEntry, User
 from voonie.backend.app.main import create_app
 from voonie.backend.app.services.pet_agent import PetCompanionAgent
 
@@ -130,6 +132,19 @@ def test_pet_chat_stream_emits_tokens_then_action():
     assert response.text.index("event: token") < response.text.index("event: action")
 
 
+def test_pet_status_is_authenticated_and_ready():
+    app = create_app(Settings(
+        DATABASE_URL="sqlite+aiosqlite:///:memory:",
+        JWT_SECRET="pet-status-test-secret-long-enough",
+        TESTING=True,
+    ))
+    with TestClient(app) as client:
+        response = client.get("/api/v1/pet/status")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ready"
+
+
 def test_pet_chat_ignores_untrusted_client_memory_context():
     provider = InspectingProvider()
     app = create_app(Settings(
@@ -153,3 +168,72 @@ def test_pet_chat_ignores_untrusted_client_memory_context():
     assert response.status_code == 200
     assert "伪造的纽约旅行" not in provider.last_prompt
     assert "客户端声称我去过纽约" not in provider.last_prompt
+
+
+def test_pet_chat_does_not_read_diaries_after_memory_opt_out():
+    provider = InspectingProvider()
+    app = create_app(Settings(
+        DATABASE_URL="sqlite+aiosqlite:///:memory:",
+        JWT_SECRET="pet-memory-opt-out-test-secret-long-enough",
+        TESTING=False,
+        ARQ_INLINE=True,
+    ))
+    app.state.pet_agent = PetCompanionAgent(provider=provider)
+
+    async def create_schema():
+        async with app.state.db_engine.begin() as connection:
+            await connection.run_sync(Base.metadata.create_all)
+
+    asyncio.run(create_schema())
+
+    with TestClient(app) as client:
+        registered = client.post("/api/v1/auth/register", json={
+            "email": "memory-opt-out@example.com",
+            "password": "correct-password",
+            "confirm_password": "correct-password",
+        })
+        assert registered.status_code == 201
+        user_id = registered.json()["user_id"]
+
+        async def seed_private_diary():
+            async with app.state.db_session_factory() as session:
+                user = await session.get(User, user_id)
+                user.memory_opt_in = False
+                session.add(DiaryEntry(
+                    user_id=user_id,
+                    local_id="memory-opt-out-secret",
+                    entry_date=datetime.now(timezone.utc),
+                    timezone="UTC",
+                    input_type="text",
+                    redacted_text="我的测试暗号是星星柠檬4729。",
+                    emotion_json={"label": "平静", "intensity": 5},
+                    event_json={},
+                    status="confirmed",
+                ))
+                await session.commit()
+
+        asyncio.run(seed_private_diary())
+        response = client.post("/api/v1/pet/chat", json={
+            "message": "我之前日记里记录的测试暗号是什么？",
+        })
+
+    assert response.status_code == 200
+    assert "星星柠檬4729" not in provider.last_prompt
+
+
+def test_pet_chat_rejects_empty_and_oversized_messages_before_provider_call():
+    provider = CountingProvider()
+    app = create_app(Settings(
+        DATABASE_URL="sqlite+aiosqlite:///:memory:",
+        JWT_SECRET="pet-input-boundary-test-secret-long-enough",
+        TESTING=True,
+    ))
+    app.state.pet_agent = PetCompanionAgent(provider=provider)
+
+    with TestClient(app) as client:
+        empty = client.post("/api/v1/pet/chat", json={"message": "   "})
+        oversized = client.post("/api/v1/pet/chat", json={"message": "长" * 4001})
+
+    assert empty.status_code == 422
+    assert oversized.status_code == 422
+    assert provider.calls == 0
