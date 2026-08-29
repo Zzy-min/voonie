@@ -1,0 +1,59 @@
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+backend/.env
+backend/.secrets/
+*.secret
+*.pem
+*.key
+
+# Dependencies and generated output
+node_modules/
+build/
+dist/
+dist-static/
+dist-audit/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.sites-runtime/
+.wrangler/
+*.tsbuildinfo
+
+# Python caches and virtual environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.pytest-data/
+.venv/
+venv/
+.coverage
+htmlcov/
+
+# Local data and generated media
+*.db
+*.sqlite
+*.sqlite3
+backend/media/
+backend/temp_media/
+media/
+
+# Logs, tunnels, and deployment artifacts
+*.log
+*.log.*
+cpolar
+cpolar.exe
+cpolar_run*
+cpolar_test.log*
+cpolar.[0-9]*
+vonnie_deploy.log*
+
+# Editor and operating-system files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# One-time authentication artifacts
+docs/plans/feishu-auth-qr.png

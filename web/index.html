@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voonie - 语音漫画日记 & 情绪陪伴小宠物</title>
+  <link rel="icon" href="/assets/favicon.ico">
+  <link rel="stylesheet" href="/style.css?v=browser-shell-4">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- 顶层外壳：模拟高质感原生应用界面 -->
+  <div class="app-window">
+    
+    <!-- 1. 左侧导航边栏 (Sidebar) -->
+    <aside class="app-sidebar">
+      <!-- 品牌 Logo -->
+      <div class="sidebar-logo">
+        <span class="logo-text">voonie</span>
+      </div>
+
+      <!-- 导航菜单 -->
+      <nav class="sidebar-nav">
+        <a href="#home" class="nav-item active" data-page="home">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+          <span>首页</span>
+        </a>
+        <a href="#library" class="nav-item" data-page="library">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+          <span>绘本库</span>
+        </a>
+        <a href="#pet" class="nav-item" data-page="pet">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v1a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3zM5 8a3 3 0 0 0-3 3v1a3 3 0 0 0 6 0v-1a3 3 0 0 0-3-3zM19 8a3 3 0 0 0-3 3v1a3 3 0 0 0 6 0v-1a3 3 0 0 0-3-3zM12 11c-3.3 0-6 2.7-6 6v1a4 4 0 0 0 4 4h4a4 4 0 0 0 4-4v-1c0-3.3-2.7-6-6-6z"/></svg>
+          <span>宠物对话</span>
+        </a>
+        <a href="#calendar" class="nav-item" data-page="calendar">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          <span>记忆日历</span>
+        </a>
+        <a href="#stats" class="nav-item" data-page="stats">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+          <span>情绪统计</span>
+        </a>
+        <a href="#settings" class="nav-item" data-page="settings">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          <span>设置</span>
+        </a>
+      </nav>
+
+      <!-- 侧边栏萌宠插图 (草地小狗) -->
+      <div class="sidebar-pet-ill">
+        <img src="/assets/reference/sidebar-pet.png" alt="萌宠小狗" class="pet-ill-img">
+      </div>
+
+      <!-- 侧边栏底部用户状态条 -->
+      <div class="sidebar-user-card">
+        <img src="/assets/user_avatar.png" alt="用户头像" class="user-avatar-small">
+        <div class="user-info-box">
+          <div class="user-title-row">
+            <span class="user-greeting">今天也要开心呀~</span>
+            <span class="user-level-badge">Lv.3</span>
+          </div>
+          <div class="user-exp-row">
+            <span class="exp-icon">⭐</span>
+            <div class="exp-progress-bar">
+              <div class="exp-progress-fill" style="width: 64%;"></div>
+            </div>
+            <span class="exp-text">320 / 500</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 2. 主视觉与交互中心 (Main Container) -->
+    <main class="app-main">
+      <!-- 顶部控制条 (搜索与系统操作) -->
+      <header class="app-header">
+        <div class="header-search-bar">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input type="text" id="globalSearchInput" placeholder="搜索绘本 / 对话 / 标签">
+        </div>
+        <div class="header-actions">
+          <button class="icon-btn header-bell-btn" title="通知提醒">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+          </button>
+          <div class="header-profile-dropdown">
+            <img src="/assets/user_header_avatar.png" alt="个人中心" class="header-user-avatar">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </div>
+        </div>
+      </header>
+
+      <!-- 主要内容区域（两栏并排：左中区域 + 右侧常驻萌宠对话） -->
+      <div class="content-split-layout">
+        
+        <!-- 左侧/中间内容滚动区 -->
+        <div class="main-left-column">
+          <!-- 顶部 Hero 欢迎与快捷记录卡片 -->
+          <section class="hero-welcome-card">
+            <div class="hero-text-content">
+              <h1 class="hero-title">Hi，今天想记录点什么呢？ <span class="wave-emoji">👋</span></h1>
+              <p class="hero-subtitle">随口倾诉 30 秒，AI 帮你生成专属微绘本</p>
+              
+              <!-- 两个快捷动作卡片 -->
+              <div class="hero-action-cards">
+                <!-- 动作1: 语音记录 -->
+                <div class="action-card record-action-card" id="btnQuickRecord">
+                  <div class="action-icon-circle mic-circle">
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+                  </div>
+                  <div class="action-text-info">
+                    <div class="action-title">语音记录</div>
+                    <div class="action-desc">30 秒生成绘本</div>
+                  </div>
+                  <button class="action-pill-btn record-btn">开始记录</button>
+                </div>
+
+                <!-- 动作2: 和萌宠聊天 -->
+                <div class="action-card chat-action-card" id="btnQuickChat">
+                  <div class="action-icon-circle chat-circle">
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/></svg>
+                  </div>
+                  <div class="action-text-info">
+                    <div class="action-title">和萌宠聊天</div>
+                    <div class="action-desc">记忆守护者 · 暖心陪伴</div>
+                  </div>
+                  <button class="action-pill-btn chat-btn">去聊天</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 右侧 Hero 萌宠小狗图 -->
+            <div class="hero-dog-ill">
+              <img src="/assets/reference/hero-pet.png" alt="萌宠小狗" class="hero-dog-img">
+            </div>
+          </section>
+
+          <!-- “最近的微绘本” 展架 -->
+          <section class="recent-comics-section">
+            <div class="section-header-row">
+              <h2 class="section-title">最近的微绘本</h2>
+              <a href="#all" class="section-more-link" id="btnAllComics">全部绘本 &gt;</a>
+            </div>
+
+            <div class="comics-grid" id="comicsContainer">
+              <!-- 绘本 1: 今天喝到了好喝的奶茶 -->
+              <div class="comic-card" data-comic-id="c1">
+                <div class="comic-cover-box">
+                  <img src="/assets/reference/comic-1.png" alt="今天喝到了好喝的奶茶" class="comic-img">
+                </div>
+                <div class="comic-meta">
+                  <div class="comic-title">今天喝到了好喝的奶茶！</div>
+                  <div class="comic-bottom-row">
+                    <span class="mood-tag tag-happy">开心</span>
+                    <span class="comic-date">2024.05.20</span>
+                    <button class="fav-icon-btn active" title="收藏">⭐</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 绘本 2: 虽然挤不上地铁，但遇到了小猫 -->
+              <div class="comic-card" data-comic-id="c2">
+                <div class="comic-cover-box">
+                  <img src="/assets/reference/comic-2.png" alt="虽然挤不上地铁，但遇到了小猫" class="comic-img">
+                </div>
+                <div class="comic-meta">
+                  <div class="comic-title">虽然挤不上地铁，但遇到了小猫</div>
+                  <div class="comic-bottom-row">
+                    <span class="mood-tag tag-warm">温馨</span>
+                    <span class="comic-date">2024.05.18</span>
+                    <button class="fav-icon-btn active" title="收藏">⭐</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 绘本 3: 有点累，但也在努力生活 -->
+              <div class="comic-card" data-comic-id="c3">
+                <div class="comic-cover-box">
+                  <img src="/assets/reference/comic-3.png" alt="有点累，但也在努力生活" class="comic-img">
+                </div>
+                <div class="comic-meta">
+                  <div class="comic-title">有点累，但也在努力生活</div>
+                  <div class="comic-bottom-row">
+                    <span class="mood-tag tag-tired">疲惫</span>
+                    <span class="comic-date">2024.05.16</span>
+                    <button class="fav-icon-btn" title="喜欢">♡</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 绘本 4: 海边的一天 -->
+              <div class="comic-card" data-comic-id="c4">
+                <div class="comic-cover-box">
+                  <img src="/assets/reference/comic-4.png" alt="海边的一天" class="comic-img">
+                </div>
+                <div class="comic-meta">
+                  <div class="comic-title">海边的一天</div>
+                  <div class="comic-bottom-row">
+                    <span class="mood-tag tag-happy">开心</span>
+                    <span class="comic-date">2024.05.10</span>
+                    <button class="fav-icon-btn" title="喜欢">♡</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- “记忆日历” 区域 -->
+          <section class="memory-calendar-section">
+            <div class="section-header-row">
+              <h2 class="section-title">记忆日历 🗓️</h2>
+              <a href="#calendar" class="section-more-link" id="btnFullCalendar">查看完整日历 &gt;</a>
+            </div>
+
+            <div class="calendar-days-row">
+              <div class="day-card" data-date="2024-05-14">
+                <span class="day-date">05/14</span>
+                <span class="day-emoji">🙂</span>
+                <span class="day-mood-pill pill-happy">开心</span>
+              </div>
+              <div class="day-card" data-date="2024-05-15">
+                <span class="day-date">05/15</span>
+                <span class="day-emoji">🙂</span>
+                <span class="day-mood-pill pill-happy">开心</span>
+              </div>
+              <div class="day-card" data-date="2024-05-16">
+                <span class="day-date">05/16</span>
+                <span class="day-emoji">🙁</span>
+                <span class="day-mood-pill pill-tired">疲惫</span>
+              </div>
+              <div class="day-card" data-date="2024-05-17">
+                <span class="day-date">05/17</span>
+                <span class="day-emoji">😐</span>
+                <span class="day-mood-pill pill-calm">平静</span>
+              </div>
+              <div class="day-card" data-date="2024-05-18">
+                <span class="day-date">05/18</span>
+                <span class="day-emoji">💖</span>
+                <span class="day-mood-pill pill-warm">温馨</span>
+              </div>
+              <div class="day-card" data-date="2024-05-19">
+                <span class="day-date">05/19</span>
+                <span class="day-emoji">☹️</span>
+                <span class="day-mood-pill pill-sad">难过</span>
+              </div>
+              <!-- 当前选中的 05/20 高亮 -->
+              <div class="day-card active" data-date="2024-05-20">
+                <span class="day-active-dot"></span>
+                <span class="day-date">05/20</span>
+                <span class="day-emoji">😀</span>
+                <span class="day-mood-pill pill-happy">开心</span>
+                <span class="day-bottom-arrow"></span>
+              </div>
+              <!-- 记录今天入口 -->
+              <div class="day-card add-day-card" id="btnAddToday">
+                <span class="add-day-plus">+</span>
+                <span class="add-day-text">记录今天</span>
+              </div>
+            </div>
+          </section>
+
+        </div>
+
+        <!-- 3. 右侧常驻萌宠陪伴对话面板 (Right Pet Chat Panel) -->
+        <aside class="app-chat-panel">
+          <!-- 聊天顶栏 -->
+          <div class="chat-header">
+            <div class="chat-title-info">
+              <h3 class="chat-main-title">和萌宠聊天</h3>
+              <span class="chat-sub-title">记忆守护者</span>
+            </div>
+            <button class="chat-more-btn" title="更多">···</button>
+          </div>
+
+          <!-- 聊天内容与对话流 -->
+          <div class="chat-messages-area" id="chatMessagesArea">
+            <!-- 顶部大只可爱的萌宠插画 -->
+            <div class="chat-top-dog-wrap">
+              <img src="/assets/reference/chat-pet.png" alt="萌宠守护者" class="chat-top-dog-img">
+            </div>
+
+            <!-- 消息 1: 宠物发出的问候 -->
+            <div class="chat-msg msg-pet">
+              <div class="bubble bubble-pet">
+                汪汪~ 有什么想问我的吗？
+              </div>
+            </div>
+
+            <!-- 消息 2: 用户提问 -->
+            <div class="chat-msg msg-user">
+              <div class="bubble bubble-user">
+                我上周哪天最难过呀？
+              </div>
+              <img src="/assets/user_avatar.png" alt="用户" class="msg-avatar user-msg-avatar">
+            </div>
+
+            <!-- 消息 3: 宠物回忆答复并带出记忆绘本卡片 -->
+            <div class="chat-msg msg-pet with-avatar">
+              <img src="/assets/dog_avatar.png" alt="萌宠" class="msg-avatar pet-msg-avatar">
+              <div class="bubble-stack">
+                <div class="bubble bubble-pet">
+                  汪汪，我帮你找到了~ 上周三（5月15日）那天你有点难过呢，不过你很勇敢，后来也好好照顾了自己！
+                </div>
+                
+                <!-- 嵌入的绘本记忆卡片 -->
+                <div class="memory-card-embed" data-comic-id="c_sad">
+                  <div class="memory-card-thumb">
+                    <img src="/assets/reference/memory.png" alt="有点难过的一天" class="thumb-img">
+                  </div>
+                  <div class="memory-card-info">
+                    <div class="memory-title">有点难过的一天</div>
+                    <span class="mood-tag tag-sad">难过</span>
+                    <div class="memory-date">2024.05.15</div>
+                    <button class="view-comic-btn" id="btnOpenSadComic">查看绘本</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 底部推荐快捷短语 (Quick Prompts) -->
+          <div class="chat-quick-prompts">
+            <button class="quick-chip" data-prompt="😊 我最开心的一天呢？">😊 我最开心的一天呢？</button>
+            <button class="quick-chip" data-prompt="📅 帮我回顾上周">📅 帮我回顾上周</button>
+            <button class="quick-chip" data-prompt="💖 随便聊聊">💖 随便聊聊</button>
+          </div>
+
+          <!-- 底部发送与语音输入框 -->
+          <div class="chat-input-bar">
+            <input type="text" id="chatTextInput" placeholder="输入想对我说的话...">
+            <button class="chat-mic-btn" id="btnChatVoice" title="按住语音对讲">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+            </button>
+          </div>
+        </aside>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- 4. 语音日记生成 4 格漫画弹窗 (Voice Comic Generation Modal) -->
+  <div class="modal-overlay hidden" id="recordModal">
+    <div class="modal-card record-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title">🎙️ 语音微绘本日记录制</h3>
+        <button class="modal-close-btn" id="closeRecordModal">✕</button>
+      </div>
+      
+      <div class="record-dialog-body">
+        <!-- 步骤1: 录音中 -->
+        <div class="record-step-panel" id="stepRecording">
+          <div class="pulsing-mic-wrap">
+            <div class="pulse-ring ring-1"></div>
+            <div class="pulse-ring ring-2"></div>
+            <button class="big-mic-btn" id="btnToggleRecord">
+              <svg viewBox="0 0 24 24" width="36" height="36" fill="white"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+            </button>
+          </div>
+          <div class="record-timer" id="recordTimer">00:15</div>
+          <div class="record-tip">随口倾诉 30 秒，AI 自动提炼情感并绘制连环微绘本</div>
+          
+          <div class="mock-voice-samples">
+            <span class="sample-label">或者点击体验预设语音日记：</span>
+            <div class="sample-tags">
+              <button class="sample-btn" data-text="今天下午我和朋友去了一家新开的咖啡馆，那里的生椰拿铁超级香浓！我们在落地窗前聊了很久，阳光洒在桌上特别治愈。">☕ 喝好喝拿铁 (开心)</button>
+              <button class="sample-btn" data-text="今天早高峰挤地铁太痛苦了，连续两趟都没上去。但是刚走出站口，在路边花坛发现了一只毛茸茸的小橘猫，蹲下来摸了摸它，心情瞬间好了！">🐱 偶遇小流浪猫 (温馨)</button>
+              <button class="sample-btn" data-text="今天连续改了三次方案，眼睛好酸，感觉整个人被掏空了。不过晚上下班给自己买了一杯热可可，明天继续加油吧。">💼 加班努力生活 (疲惫)</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 步骤2: AI 生成中 (进度与四幕分镜拆解) -->
+        <div class="record-step-panel hidden" id="stepGenerating">
+          <div class="ai-processing-header">
+            <div class="ai-spinner"></div>
+            <div class="ai-status-title" id="aiStatusText">AI 正在转写并提炼四幕微绘本分镜...</div>
+          </div>
+          
+          <div class="transcription-preview-box">
+            <div class="box-label">📝 语音转文字原稿</div>
+            <div class="transcription-text" id="aiTranscriptPreview">今天下午在阳光极好的时候点了一杯芝士奶盖...</div>
+          </div>
+
+          <div class="storyboard-pipeline">
+            <div class="story-stage" id="stage1">① 情感分析与日记摘要</div>
+            <div class="story-stage" id="stage2">② 四幕分镜剧本生成 (起承转合)</div>
+            <div class="story-stage" id="stage3">③ 手绘日系漫画渲染</div>
+            <div class="story-stage" id="stage4">④ 合成四格连环微绘本</div>
+          </div>
+        </div>
+
+        <!-- 步骤3: 生成完成与预览 -->
+        <div class="record-step-panel hidden" id="stepResult">
+          <div class="comic-result-card">
+            <div class="comic-result-head">
+              <h4 id="resultComicTitle">今天喝到了好喝的奶茶！</h4>
+              <div class="result-tags">
+                <span class="mood-tag tag-happy" id="resultMoodTag">开心</span>
+                <span class="result-date" id="resultDate">2024.05.20</span>
+              </div>
+            </div>
+            <div class="result-comic-grid" id="resultComicGrid">
+              <!-- 四格画面由 JS 填充 -->
+            </div>
+          </div>
+          
+          <div class="result-actions-row">
+            <button class="secondary-btn" id="btnSaveToLibrary">保存至绘本库</button>
+            <button class="primary-btn" id="btnExportLongImg">📥 导出高清四格长图</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 5. 绘本大图详情弹窗 (Comic Detail Viewer) -->
+  <div class="modal-overlay hidden" id="comicViewerModal">
+    <div class="modal-card viewer-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title" id="viewerModalTitle">微绘本详情</h3>
+        <button class="modal-close-btn" id="closeViewerModal">✕</button>
+      </div>
+      <div class="viewer-dialog-body">
+        <div class="viewer-comic-large">
+          <img src="" alt="绘本大图" id="viewerLargeImg" class="large-comic-img">
+        </div>
+        <div class="viewer-sidebar-info">
+          <h2 class="viewer-title" id="viewerDetailTitle">今天喝到了好喝的奶茶！</h2>
+          <div class="viewer-tags-row">
+            <span class="mood-tag tag-happy" id="viewerDetailTag">开心</span>
+            <span class="viewer-date" id="viewerDetailDate">2024.05.20</span>
+          </div>
+          <div class="viewer-diary-story">
+            <h4>📖 当天语音日记记录</h4>
+            <p id="viewerDetailStory">
+              今天阳光特别好，和朋友约了一家新店，点了一杯超满意的芝士奶盖！路上有说有笑，微风吹着好舒服，生活就是要多一点这样的小确幸呀！
+            </p>
+          </div>
+          <div class="viewer-ai-comment">
+            <div class="pet-companion-word-box">
+              <img src="/assets/dog_avatar.png" class="pet-avatar-mini" alt="小狗">
+              <span>萌宠评语：汪汪！记录下的快乐会变成发光的糖果哦~</span>
+            </div>
+          </div>
+          <button class="primary-btn export-btn" id="btnViewerExport">📥 导出高清长图</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
+

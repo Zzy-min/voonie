@@ -1,0 +1,1976 @@
+/* ==========================================================================
+   Voonie UI 全局样式表 - 对照高保真设计图像素级还原 (V3 完美版)
+   ========================================================================== */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+:root {
+  --bg-app: #F6F3ED;
+  --bg-card: #FFFFFF;
+  --bg-sidebar: #F9F6F0;
+  --bg-hero: linear-gradient(135deg, #FFFDF8 0%, #FFF4DE 100%);
+  --border-subtle: #EFE8DC;
+  --border-light: rgba(0, 0, 0, 0.04);
+  
+  --color-primary: #FF7828;
+  --color-primary-light: #FFF0E6;
+  --color-primary-hover: #F06514;
+  --color-green: #588157;
+  --color-green-light: #EBF3E8;
+  
+  --text-main: #2D2319;
+  --text-sub: #7C7164;
+  --text-light: #A39788;
+  --text-brand: #4A2810;
+
+  --shadow-card: 0 4px 16px rgba(180, 150, 120, 0.06);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.03);
+  --shadow-modal: 0 16px 40px rgba(74, 40, 16, 0.15);
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Nunito", sans-serif;
+  background-color: #EAE5DC;
+  color: var(--text-main);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 16px;
+  overflow-x: hidden;
+}
+
+/* 整体窗口外壳 (模拟桌面端原生窗口质感) */
+.app-window {
+  width: 1440px;
+  height: 900px;
+  max-width: 100vw;
+  max-height: 100vh;
+  background-color: var(--bg-app);
+  border-radius: 20px;
+  box-shadow: 0 12px 48px rgba(90, 70, 50, 0.12);
+  display: flex;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid #E6DEC8;
+}
+
+/* ==========================================================================
+   1. 左侧功能边栏 (Sidebar)
+   ========================================================================== */
+.app-sidebar {
+  width: 175px;
+  background-color: var(--bg-sidebar);
+  border-right: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  padding: 24px 12px 16px 16px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.sidebar-logo {
+  padding-left: 8px;
+  margin-bottom: 24px;
+}
+
+.logo-text {
+  font-family: 'Fredoka', 'Nunito', cursive, sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text-brand);
+  letter-spacing: -0.5px;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  color: var(--text-sub);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.nav-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.nav-item:hover {
+  background-color: rgba(255, 120, 40, 0.06);
+  color: var(--color-primary);
+}
+
+.nav-item.active {
+  background-color: #FFE6D5;
+  color: #E65A00;
+  font-weight: 700;
+}
+
+.nav-item.active .nav-icon {
+  color: #E65A00;
+}
+
+/* 侧边栏萌宠插图 */
+.sidebar-pet-ill {
+  margin-top: auto;
+  margin-bottom: 8px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.pet-ill-img {
+  width: 140px;
+  height: auto;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
+}
+
+/* 侧边栏底部用户状态条 */
+.sidebar-user-card {
+  background-color: #FFFFFF;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+}
+
+.user-avatar-small {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.user-info-box {
+  flex: 1;
+  min-width: 0;
+}
+
+.user-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.user-greeting {
+  font-size: 11px;
+  color: var(--text-main);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-level-badge {
+  background-color: #FFF2D6;
+  color: #D97706;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+
+.user-exp-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.exp-icon {
+  font-size: 9px;
+}
+
+.exp-progress-bar {
+  flex: 1;
+  height: 4px;
+  background-color: #F1ECE3;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.exp-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #FBBF24, #F59E0B);
+  border-radius: 2px;
+}
+
+.exp-text {
+  font-size: 9px;
+  color: var(--text-light);
+}
+
+/* ==========================================================================
+   2. 主容器区 (Main Container)
+   ========================================================================== */
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background-color: var(--bg-app);
+}
+
+/* 顶部操作条 */
+.app-header {
+  height: 52px;
+  padding: 10px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+}
+
+.header-search-bar {
+  width: 320px;
+  height: 36px;
+  background-color: #FFFFFF;
+  border: 1px solid var(--border-subtle);
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  gap: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+}
+
+.search-icon {
+  width: 15px;
+  height: 15px;
+  color: var(--text-light);
+}
+
+.header-search-bar input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 12px;
+  color: var(--text-main);
+  width: 100%;
+}
+
+.header-search-bar input::placeholder {
+  color: var(--text-light);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.header-bell-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-sub);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.header-profile-dropdown {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.header-user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+
+/* 两栏内容布局 (左侧内容 + 右侧常驻萌宠对话) */
+.content-split-layout {
+  flex: 1;
+  display: flex;
+  padding: 0 20px 20px 20px;
+  gap: 16px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.main-left-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.main-left-column::-webkit-scrollbar {
+  width: 4px;
+}
+
+.main-left-column::-webkit-scrollbar-thumb {
+  background: #E2DAD0;
+  border-radius: 4px;
+}
+
+/* ==========================================================================
+   3. Hero 欢迎卡片
+   ========================================================================== */
+.hero-welcome-card {
+  background: var(--bg-hero);
+  border: 1px solid #F5E8D3;
+  border-radius: 20px;
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  box-shadow: 0 4px 16px rgba(230, 200, 160, 0.1);
+}
+
+.hero-text-content {
+  flex: 1;
+  z-index: 1;
+}
+
+.hero-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-main);
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wave-emoji {
+  font-size: 20px;
+}
+
+.hero-subtitle {
+  font-size: 12px;
+  color: var(--text-sub);
+  margin-bottom: 16px;
+}
+
+.hero-action-cards {
+  display: flex;
+  gap: 14px;
+}
+
+.action-card {
+  background-color: #FFFFFF;
+  border-radius: 14px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #F5ECE0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.action-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(255, 120, 40, 0.08);
+}
+
+.action-icon-circle {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.mic-circle {
+  background-color: #FFF0E8;
+  color: #FF661A;
+}
+
+.chat-circle {
+  background-color: #EEF5EB;
+  color: #558B2F;
+}
+
+.action-text-info {
+  margin-right: 8px;
+}
+
+.action-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.action-desc {
+  font-size: 10px;
+  color: var(--text-light);
+  margin-top: 1px;
+}
+
+.action-pill-btn {
+  border: none;
+  padding: 6px 14px;
+  border-radius: 16px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.record-btn {
+  background: linear-gradient(135deg, #FF7828 0%, #FA541C 100%);
+  color: #FFFFFF;
+}
+
+.record-btn:hover {
+  opacity: 0.9;
+}
+
+.chat-btn {
+  background-color: #558B2F;
+  color: #FFFFFF;
+}
+
+.chat-btn:hover {
+  opacity: 0.9;
+}
+
+.hero-dog-ill {
+  width: 170px;
+  flex-shrink: 0;
+  margin-right: 12px;
+}
+
+.hero-dog-img {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  display: block;
+}
+
+/* ==========================================================================
+   4. “最近的微绘本” 展架
+   ========================================================================== */
+.recent-comics-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.section-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.section-more-link {
+  font-size: 11px;
+  color: var(--text-light);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.section-more-link:hover {
+  color: var(--color-primary);
+}
+
+.comics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.comic-card {
+  background-color: #FFFFFF;
+  border-radius: 16px;
+  padding: 8px;
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.comic-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 18px rgba(180, 150, 120, 0.12);
+  border-color: #F0DDC5;
+}
+
+.comic-cover-box {
+  width: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 6px;
+  background-color: #FAF6EF;
+}
+
+.comic-img {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: cover;
+}
+
+.comic-meta {
+  padding: 2px 4px 4px 4px;
+}
+
+.comic-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.comic-bottom-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mood-tag {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.tag-happy {
+  background-color: #FFEAE4;
+  color: #FA541C;
+}
+
+.tag-warm {
+  background-color: #FFF3D6;
+  color: #D48806;
+}
+
+.tag-tired {
+  background-color: #E6F0F8;
+  color: #3B719F;
+}
+
+.tag-sad {
+  background-color: #E6F4FF;
+  color: #0958D9;
+}
+
+.comic-date {
+  font-size: 10px;
+  color: var(--text-light);
+}
+
+.fav-icon-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-light);
+}
+
+.fav-icon-btn.active {
+  color: #FAAD14;
+}
+
+/* ==========================================================================
+   5. “记忆日历” 区域
+   ========================================================================== */
+.memory-calendar-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.calendar-days-row {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 8px;
+}
+
+.day-card {
+  background-color: #FFFFFF;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 10px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.day-card:hover {
+  transform: translateY(-2px);
+  border-color: #F5D3B8;
+}
+
+.day-date {
+  font-size: 11px;
+  color: var(--text-main);
+  font-weight: 600;
+}
+
+.day-emoji {
+  font-size: 16px;
+}
+
+.day-mood-pill {
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+.pill-happy { background-color: #FFF2D6; color: #D48806; }
+.pill-tired { background-color: #EBF1F6; color: #597184; }
+.pill-calm { background-color: #EAF4EC; color: #389E0D; }
+.pill-warm { background-color: #FFEBF0; color: #EB2F96; }
+.pill-sad { background-color: #E8F4FD; color: #1890FF; }
+
+/* 选中高亮状态 (05/20) */
+.day-card.active {
+  background: linear-gradient(180deg, #FFF8F2 0%, #FFFFFF 100%);
+  border: 1.5px solid #FF7828;
+  box-shadow: 0 4px 12px rgba(255, 120, 40, 0.12);
+}
+
+.day-active-dot {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  width: 4px;
+  height: 4px;
+  background-color: #FF5500;
+  border-radius: 50%;
+}
+
+.day-bottom-arrow {
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid #FF7828;
+}
+
+/* “+ 记录今天” 卡片 */
+.add-day-card {
+  background-color: #FAF7F0;
+  border: 1px dashed #E0D4C3;
+  justify-content: center;
+}
+
+.add-day-plus {
+  font-size: 18px;
+  color: var(--text-sub);
+  font-weight: 400;
+}
+
+.add-day-text {
+  font-size: 10px;
+  color: var(--text-sub);
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   6. 右侧常驻萌宠陪伴对话面板 (Right Pet Chat Panel)
+   ========================================================================== */
+.app-chat-panel {
+  width: 320px;
+  background-color: var(--bg-card);
+  border-radius: 20px;
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.chat-header {
+  padding: 14px 16px 8px 16px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.chat-main-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.chat-sub-title {
+  font-size: 10px;
+  color: var(--text-light);
+  font-weight: 500;
+}
+
+.chat-more-btn {
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  color: var(--text-light);
+  cursor: pointer;
+}
+
+.chat-messages-area {
+  flex: 1;
+  padding: 10px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+.chat-messages-area::-webkit-scrollbar {
+  width: 3px;
+}
+
+.chat-messages-area::-webkit-scrollbar-thumb {
+  background: #EAE1D5;
+  border-radius: 3px;
+}
+
+.chat-top-dog-wrap {
+  text-align: center;
+  margin-top: -6px;
+  margin-bottom: 4px;
+}
+
+.chat-top-dog-img {
+  width: 150px;
+  height: auto;
+  object-fit: contain;
+}
+
+.chat-msg {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.msg-pet {
+  justify-content: flex-start;
+}
+
+.msg-user {
+  justify-content: flex-end;
+}
+
+.bubble {
+  max-width: 85%;
+  padding: 9px 13px;
+  border-radius: 16px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.bubble-pet {
+  background-color: #F8F5EE;
+  color: var(--text-main);
+  border-top-left-radius: 4px;
+}
+
+.bubble-user {
+  background-color: #FFE6D5;
+  color: #7C3A00;
+  border-top-right-radius: 4px;
+  font-weight: 600;
+}
+
+.msg-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.bubble-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 85%;
+}
+
+/* 聊天中嵌入的微缩绘本卡片 */
+.memory-card-embed {
+  background-color: #FFFFFF;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 6px 8px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+}
+
+.memory-card-thumb {
+  width: 60px;
+  height: 80px;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background-color: #F6F2EA;
+}
+
+.thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.memory-card-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.memory-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.memory-date {
+  font-size: 9px;
+  color: var(--text-light);
+}
+
+.view-comic-btn {
+  margin-top: 2px;
+  background: #FF7828;
+  color: #FFFFFF;
+  border: none;
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.view-comic-btn:hover {
+  background: var(--color-primary-hover);
+}
+
+/* 快捷提问词 */
+.chat-quick-prompts {
+  padding: 6px 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.quick-chip {
+  background-color: #F8F5EE;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 4px 8px;
+  font-size: 10px;
+  color: var(--text-sub);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.quick-chip:hover {
+  background-color: #FFEFE5;
+  color: var(--color-primary);
+  border-color: #F5D3B8;
+}
+
+/* 底部发送与语音输入框 */
+.chat-input-bar {
+  padding: 10px 14px;
+  border-top: 1px solid #F5EFE6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chat-input-bar input {
+  flex: 1;
+  height: 36px;
+  background-color: #F8F5EE;
+  border: 1px solid transparent;
+  border-radius: 18px;
+  padding: 0 14px;
+  font-size: 12px;
+  outline: none;
+  color: var(--text-main);
+}
+
+.chat-input-bar input:focus {
+  background-color: #FFFFFF;
+  border-color: #FF944D;
+}
+
+.chat-mic-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #FF7828 0%, #FA541C 100%);
+  color: #FFFFFF;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(255, 120, 40, 0.25);
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.chat-mic-btn:hover {
+  transform: scale(1.05);
+}
+
+/* ==========================================================================
+   7. 弹窗与交互 (Modals)
+   ========================================================================== */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(30, 20, 10, 0.45);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.modal-card {
+  background-color: #FFFFFF;
+  border-radius: 20px;
+  box-shadow: var(--shadow-modal);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.modal-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.modal-close-btn {
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  color: var(--text-light);
+  cursor: pointer;
+}
+
+/* 录音弹窗 */
+.record-dialog {
+  width: 580px;
+  max-height: 85vh;
+}
+
+.record-dialog-body {
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.pulsing-mic-wrap {
+  position: relative;
+  width: 90px;
+  height: 90px;
+  margin: 10px auto 16px auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.big-mic-btn {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #FF7828 0%, #FA541C 100%);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(255, 120, 40, 0.4);
+  z-index: 2;
+}
+
+.pulse-ring {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background-color: rgba(255, 120, 40, 0.2);
+  animation: pulseAnim 2s infinite;
+}
+
+.ring-2 {
+  animation-delay: 0.6s;
+}
+
+@keyframes pulseAnim {
+  0% { transform: scale(0.8); opacity: 0.8; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+
+.record-timer {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text-main);
+  text-align: center;
+  font-family: monospace;
+}
+
+.record-tip {
+  font-size: 13px;
+  color: var(--text-sub);
+  text-align: center;
+  margin-top: 6px;
+  margin-bottom: 24px;
+}
+
+.mock-voice-samples {
+  background-color: #FBF8F2;
+  border-radius: 12px;
+  padding: 14px;
+  border: 1px solid var(--border-subtle);
+}
+
+.sample-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-main);
+  display: block;
+  margin-bottom: 8px;
+}
+
+.sample-tags {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sample-btn {
+  background-color: #FFFFFF;
+  border: 1px solid #EADDC8;
+  border-radius: 8px;
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 12px;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sample-btn:hover {
+  background-color: #FFF4EC;
+  border-color: #FF7828;
+  color: #E65A00;
+}
+
+/* AI 生成中 */
+.ai-processing-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.ai-spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid #FFE0CC;
+  border-top-color: #FF7828;
+  border-radius: 50%;
+  animation: spin 1s infinite linear;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.ai-status-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.transcription-preview-box {
+  background-color: #F8F5EE;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border-subtle);
+}
+
+.box-label {
+  font-size: 11px;
+  color: var(--text-light);
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.transcription-text {
+  font-size: 13px;
+  color: var(--text-main);
+  line-height: 1.5;
+}
+
+.storyboard-pipeline {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.story-stage {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background-color: #F8F6F0;
+  font-size: 12px;
+  color: var(--text-sub);
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.story-stage.active {
+  background-color: #FFF0E6;
+  color: #E65A00;
+  font-weight: 700;
+}
+
+.story-stage.done {
+  background-color: #EAF4EC;
+  color: #389E0D;
+}
+
+/* 生成结果卡片 */
+.comic-result-card {
+  background-color: #FAF7F2;
+  border-radius: 14px;
+  padding: 14px;
+  border: 1px solid var(--border-subtle);
+  margin-bottom: 16px;
+}
+
+.comic-result-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.comic-result-head h4 {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.result-comic-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.result-panel-box {
+  background-color: #FFFFFF;
+  border-radius: 8px;
+  padding: 8px;
+  border: 1px solid #EFE6D8;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.result-panel-caption {
+  font-size: 11px;
+  color: var(--text-main);
+  font-weight: 600;
+}
+
+.result-panel-img {
+  width: 100%;
+  height: 110px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.result-actions-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.primary-btn {
+  background: linear-gradient(135deg, #FF7828 0%, #FA541C 100%);
+  color: #FFFFFF;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.secondary-btn {
+  background: #F2ECE1;
+  color: var(--text-main);
+  border: none;
+  padding: 8px 18px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* 详情查看器 */
+.viewer-dialog {
+  width: 780px;
+  max-height: 90vh;
+}
+
+.viewer-dialog-body {
+  padding: 20px;
+  display: flex;
+  gap: 20px;
+}
+
+.viewer-comic-large {
+  width: 360px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  background: #FAF6EF;
+  flex-shrink: 0;
+}
+
+.large-comic-img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.viewer-sidebar-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.viewer-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.viewer-tags-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.viewer-date {
+  font-size: 12px;
+  color: var(--text-light);
+}
+
+.viewer-diary-story {
+  background-color: #FAF7F0;
+  border-radius: 10px;
+  padding: 12px;
+  border: 1px solid var(--border-subtle);
+}
+
+.viewer-diary-story h4 {
+  font-size: 12px;
+  color: var(--text-sub);
+  margin-bottom: 6px;
+}
+
+.viewer-diary-story p {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-main);
+}
+
+.pet-companion-word-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #FFF7EC;
+  border: 1px solid #FFE2C2;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: #8C3E00;
+  font-weight: 600;
+}
+
+.pet-avatar-mini {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+}
+
+.hidden { display: none !important; }
+
+/* ========================================================================== 
+   Reference-calibrated layout (1536 x 1024 artwork)
+   ========================================================================== */
+:root {
+  --frame-gap-x: 22px;
+  --frame-gap-y: 20px;
+  --sidebar-width: 220px;
+  --header-height: 72px;
+  --content-gap: 20px;
+  --chat-width: 390px;
+  --radius-window: 20px;
+  --radius-panel: 16px;
+  --radius-card: 12px;
+  --surface-canvas: #fbfaf7;
+  --surface-warm: #fffaf2;
+  --line-soft: #eee8df;
+  --ink-strong: #3c2b1e;
+  --ink-muted: #84766a;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  padding: var(--frame-gap-y) var(--frame-gap-x);
+  background: #fff8e9;
+}
+
+.app-window {
+  width: calc(100vw - (var(--frame-gap-x) * 2));
+  height: calc(100vh - (var(--frame-gap-y) * 2));
+  max-width: none;
+  max-height: none;
+  border-radius: var(--radius-window);
+  background: var(--surface-canvas);
+  border-color: #ece5d9;
+  box-shadow: 0 10px 34px rgba(91, 69, 45, 0.15);
+}
+
+.app-sidebar {
+  width: var(--sidebar-width);
+  padding: 36px 16px 28px;
+  background: #fffdf9;
+}
+
+.sidebar-logo {
+  padding-left: 24px;
+  margin-bottom: 28px;
+}
+
+.logo-text {
+  font-size: 29px;
+  letter-spacing: 0;
+}
+
+.sidebar-nav { gap: 9px; }
+
+.nav-item {
+  min-height: 54px;
+  padding: 0 24px;
+  gap: 14px;
+  border-radius: 15px;
+  font-size: 16px;
+}
+
+.nav-icon { width: 20px; height: 20px; }
+.nav-item.active { background: #fff0df; color: #ee6b21; }
+
+.sidebar-pet-ill {
+  margin: auto -16px 15px;
+  height: 315px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.pet-ill-img { width: 180px; max-width: none; }
+
+.sidebar-user-card {
+  min-height: 102px;
+  padding: 12px 10px;
+  border-radius: 14px;
+}
+
+.header-user-avatar { width: 38px; height: 38px; }
+.header-bell-btn svg { width: 22px; height: 22px; }
+
+.content-split-layout {
+  padding: 0 14px 29px 24px;
+  gap: var(--content-gap);
+}
+
+.main-left-column {
+  gap: 22px;
+  padding-right: 0;
+  overflow-x: hidden;
+}
+
+.hero-welcome-card {
+  min-height: 322px;
+  padding: 34px 33px 24px;
+  align-items: stretch;
+  border-radius: var(--radius-panel);
+  overflow: hidden;
+}
+
+.hero-title {
+  font-size: 27px;
+  line-height: 1.3;
+  margin-bottom: 10px;
+}
+
+.wave-emoji { font-size: 24px; }
+.hero-subtitle { font-size: 15px; margin-bottom: 35px; }
+
+.hero-action-cards {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.chat-action-card { display: grid; }
+
+.action-card {
+  min-width: 0;
+  min-height: 155px;
+  padding: 28px 32px;
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 28px;
+  row-gap: 12px;
+  border-radius: var(--radius-panel);
+}
+
+.action-icon-circle {
+  grid-row: 1 / 3;
+  align-self: center;
+  width: 82px;
+  height: 82px;
+}
+
+.action-icon-circle svg { width: 43px; height: 43px; }
+.action-text-info { align-self: end; margin: 0; }
+.action-title { font-size: 18px; }
+.action-desc { margin-top: 5px; font-size: 13px; white-space: nowrap; }
+.action-pill-btn { align-self: start; justify-self: start; min-width: 104px; height: 34px; padding: 0 20px; font-size: 14px; }
+
+.hero-dog-ill {
+  position: absolute;
+  z-index: 1;
+  top: 5px;
+  right: 55px;
+  width: 260px;
+  height: 138px;
+  margin: 0;
+  overflow: hidden;
+}
+
+.recent-comics-section,
+.memory-calendar-section { gap: 12px; }
+.section-title { font-size: 16px; }
+.section-more-link { font-size: 12px; }
+.comics-grid { gap: 12px; }
+
+.comic-card {
+  min-width: 0;
+  height: 309px;
+  padding: 8px;
+  border-radius: var(--radius-card);
+}
+
+.comic-cover-box { height: 207px; border-radius: 8px; margin-bottom: 7px; }
+.comic-img { height: 100%; object-fit: cover; }
+.comic-title { font-size: 13px; margin-bottom: 8px; }
+.comic-meta { padding: 1px 4px 3px; }
+.comic-bottom-row { display: grid; grid-template-columns: 1fr auto; gap: 7px; }
+.comic-date { grid-column: 1; grid-row: 2; font-size: 11px; }
+.fav-icon-btn { grid-column: 2; grid-row: 1 / 3; font-size: 18px; align-self: center; color: #a99c8e; }
+.mood-tag { justify-self: start; font-size: 10px; }
+
+.calendar-days-row { gap: 9px; }
+.day-card { min-width: 0; height: 108px; padding: 10px 4px; border-radius: 12px; }
+.day-date { font-size: 12px; }
+.day-emoji { font-size: 25px; line-height: 1; }
+.day-mood-pill { font-size: 10px; padding: 2px 12px; }
+.add-day-plus { font-size: 30px; line-height: 1; }
+.add-day-text { font-size: 12px; }
+
+.app-chat-panel {
+  width: var(--chat-width);
+  border-radius: var(--radius-panel);
+  background: #fffaf3;
+}
+
+.chat-header { padding: 26px 24px 10px; }
+.chat-main-title { font-size: 16px; }
+.chat-sub-title { font-size: 12px; margin-top: 5px; display: block; }
+.chat-more-btn { color: #3a2b20; font-size: 18px; }
+.chat-messages-area { padding: 8px 14px 10px; gap: 14px; }
+
+.chat-top-dog-wrap {
+  order: -2;
+  height: 222px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chat-top-dog-img { width: 300px; max-width: none; }
+.chat-top-dog-img { transform: translateX(-18px); }
+.chat-msg { gap: 10px; }
+.bubble { max-width: 88%; padding: 12px 16px; border-radius: 16px; font-size: 14px; line-height: 1.55; }
+.chat-messages-area > .msg-pet:first-of-type { display: none; }
+.chat-messages-area { position: relative; }
+.msg-avatar { width: 45px; height: 45px; }
+.bubble-stack { max-width: 87%; gap: 10px; }
+.memory-card-embed { padding: 8px 10px; gap: 14px; border-radius: 14px; }
+.memory-card-thumb { width: 112px; height: 118px; }
+.memory-title { font-size: 14px; }
+.memory-date { font-size: 12px; }
+.view-comic-btn { font-size: 12px; padding: 6px 14px; }
+.chat-quick-prompts { padding: 7px 14px 10px; flex-wrap: nowrap; gap: 8px; }
+.quick-chip { min-width: 0; padding: 7px 9px; font-size: 11px; white-space: nowrap; }
+.chat-input-bar { padding: 12px 14px 17px; gap: 14px; }
+.chat-input-bar input { height: 58px; border-radius: 15px; background: #fff; border-color: var(--line-soft); }
+.chat-mic-btn { width: 44px; height: 44px; }
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+.comic-card:focus-visible,
+.day-card:focus-visible {
+  outline: 3px solid rgba(255, 120, 40, 0.28);
+  outline-offset: 2px;
+}
+
+button:active { transform: translateY(1px); }
+button:disabled,
+input:disabled { cursor: not-allowed; opacity: 0.5; }
+
+@media (max-width: 1279px) {
+  :root { --sidebar-width: 188px; --chat-width: 330px; }
+  .app-sidebar { padding-left: 12px; padding-right: 12px; }
+  .nav-item { padding: 0 18px; }
+  .action-card { padding: 22px 18px; grid-template-columns: 64px minmax(0, 1fr); column-gap: 18px; }
+  .action-icon-circle { width: 64px; height: 64px; }
+  .hero-dog-ill { right: 18px; }
+}
+
+@media (max-width: 1023px) {
+  body { padding: 0; }
+  .app-window { width: 100vw; height: 100vh; border: 0; border-radius: 0; }
+  .app-sidebar { width: 82px; padding: 24px 10px; }
+  .sidebar-logo { padding: 0; text-align: center; }
+  .logo-text { font-size: 20px; }
+  .nav-item { padding: 0; justify-content: center; }
+  .nav-item span, .sidebar-user-card, .sidebar-pet-ill { display: none; }
+  .content-split-layout { padding-left: 16px; }
+  .app-chat-panel { width: 310px; }
+  .hero-action-cards { grid-template-columns: 1fr; }
+  .hero-welcome-card { min-height: auto; }
+  .hero-dog-ill { opacity: 0.55; }
+  .comics-grid { grid-template-columns: repeat(2, 1fr); }
+  .calendar-days-row { grid-template-columns: repeat(4, 1fr); }
+}
+
+@media (max-width: 767px) {
+  .app-sidebar { display: none; }
+  .app-main,
+  .content-split-layout,
+  .main-left-column,
+  .hero-welcome-card,
+  .recent-comics-section,
+  .memory-calendar-section,
+  .app-chat-panel { width: 100%; min-width: 0; max-width: 100%; }
+  .app-header { height: 70px; padding: 12px 16px; }
+  .window-controls { display: none; }
+  .header-search-bar { width: min(220px, 55vw); }
+  .content-split-layout { padding: 0 12px 16px; display: block; overflow-y: auto; }
+  .main-left-column { overflow: visible; }
+  .app-chat-panel { width: 100%; min-height: 680px; margin-top: 20px; }
+  .chat-quick-prompts { overflow-x: auto; }
+  .quick-chip { flex: 0 0 auto; }
+  .hero-welcome-card { padding: 24px 18px; }
+  .hero-title { font-size: 22px; }
+  .hero-dog-ill { display: none; }
+  .action-card { min-height: 126px; }
+  .comics-grid { grid-template-columns: 1fr; }
+  .comic-card { height: auto; }
+  .comic-cover-box { height: auto; aspect-ratio: 165 / 210; }
+  .calendar-days-row { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Desktop artwork fidelity: use the supplied reference as a pixel-accurate
+   sprite sheet. Responsive layouts below 1280px keep the standalone assets. */
+@media (min-width: 1280px) {
+  .sidebar-pet-ill,
+  .hero-dog-ill,
+  .chat-top-dog-wrap,
+  .comic-cover-box,
+  .memory-card-thumb {
+    background-image: url('/assets/reference-ui.png');
+    background-repeat: no-repeat;
+    background-size: 1536px 1024px;
+  }
+
+  .sidebar-pet-ill {
+    width: 220px;
+    height: 267px;
+    margin-left: -16px;
+    margin-right: -16px;
+    background-position: -23px -546px;
+    align-self: center;
+  }
+
+  .sidebar-pet-ill .pet-ill-img { visibility: hidden; }
+
+  .hero-dog-ill {
+    top: 0;
+    right: 0;
+    width: 300px;
+    height: 141px;
+    background-position: -791px -117px;
+  }
+
+  .hero-dog-ill .hero-dog-img { visibility: hidden; }
+
+  .chat-top-dog-wrap {
+    width: 360px;
+    height: 220px;
+    flex: 0 0 220px;
+    background-position: -1125px -195px;
+  }
+
+  .chat-top-dog-wrap .chat-top-dog-img { visibility: hidden; }
+
+  .comic-cover-box { background-color: #faf6ef; }
+  .comic-cover-box .comic-img { visibility: hidden; }
+  .comic-card:nth-child(1) .comic-cover-box { background-position: -275px -503px; }
+  .comic-card:nth-child(2) .comic-cover-box { background-position: -485px -503px; }
+  .comic-card:nth-child(3) .comic-cover-box { background-position: -694px -503px; }
+  .comic-card:nth-child(4) .comic-cover-box { background-position: -903px -503px; }
+
+  .memory-card-thumb {
+    background-position: -1191px -619px;
+    background-size: 1536px 1024px;
+  }
+
+  .memory-card-thumb .thumb-img { visibility: hidden; }
+
+  .header-user-avatar,
+  .user-avatar-small,
+  .msg-avatar,
+  .day-emoji {
+    background-image: url('/assets/reference-ui.png');
+    background-repeat: no-repeat;
+    background-size: 1536px 1024px;
+  }
+
+  .header-user-avatar {
+    width: 40px;
+    height: 40px;
+    object-position: 9999px 9999px;
+    background-position: -1429px -55px;
+  }
+
+  .user-avatar-small {
+    width: 44px;
+    height: 44px;
+    object-position: 9999px 9999px;
+    background-position: -51px -886px;
+  }
+
+  .pet-msg-avatar {
+    object-position: 9999px 9999px;
+    background-position: -1126px -519px;
+  }
+
+  .user-msg-avatar {
+    object-position: 9999px 9999px;
+    background-position: -1431px -432px;
+  }
+
+  .day-emoji {
+    width: 28px;
+    height: 28px;
+    overflow: hidden;
+    color: transparent;
+    font-size: 0;
+  }
+
+  .day-card:nth-child(1) .day-emoji { background-position: -297px -898px; }
+  .day-card:nth-child(2) .day-emoji { background-position: -398px -898px; }
+  .day-card:nth-child(3) .day-emoji { background-position: -499px -898px; }
+  .day-card:nth-child(4) .day-emoji { background-position: -600px -898px; }
+  .day-card:nth-child(5) .day-emoji { background-position: -701px -898px; }
+  .day-card:nth-child(6) .day-emoji { background-position: -802px -898px; }
+  .day-card:nth-child(7) .day-emoji { background-position: -902px -898px; }
+}
+
+@media (min-width: 1280px) {
+  .sidebar-pet-ill,
+  .hero-dog-ill,
+  .chat-top-dog-wrap,
+  .comic-cover-box,
+  .memory-card-thumb,
+  .header-user-avatar,
+  .user-avatar-small,
+  .msg-avatar,
+  .day-emoji {
+    background-size: 100% 100%;
+    background-position: center;
+  }
+
+  .sidebar-pet-ill { background-image: url('/assets/reference/sidebar-pet.png'); }
+  .hero-dog-ill { background-image: url('/assets/reference/hero-pet.png'); }
+  .chat-top-dog-wrap { background-image: url('/assets/reference/chat-pet.png'); }
+  .comic-card:nth-child(1) .comic-cover-box { background-image: url('/assets/reference/comic-1.png'); }
+  .comic-card:nth-child(2) .comic-cover-box { background-image: url('/assets/reference/comic-2.png'); }
+  .comic-card:nth-child(3) .comic-cover-box { background-image: url('/assets/reference/comic-3.png'); }
+  .comic-card:nth-child(4) .comic-cover-box { background-image: url('/assets/reference/comic-4.png'); }
+  .memory-card-thumb { background-image: url('/assets/reference/memory.png'); }
+  .header-user-avatar { background-image: url('/assets/reference/avatar-header.png'); }
+  .user-avatar-small { background-image: url('/assets/reference/avatar-sidebar.png'); }
+  .pet-msg-avatar { background-image: url('/assets/reference/avatar-pet.png'); }
+  .user-msg-avatar { background-image: url('/assets/reference/avatar-user.png'); }
+  .day-card:nth-child(1) .day-emoji { background-image: url('/assets/reference/mood-1.png'); }
+  .day-card:nth-child(2) .day-emoji { background-image: url('/assets/reference/mood-2.png'); }
+  .day-card:nth-child(3) .day-emoji { background-image: url('/assets/reference/mood-3.png'); }
+  .day-card:nth-child(4) .day-emoji { background-image: url('/assets/reference/mood-4.png'); }
+  .day-card:nth-child(5) .day-emoji { background-image: url('/assets/reference/mood-5.png'); }
+  .day-card:nth-child(6) .day-emoji { background-image: url('/assets/reference/mood-6.png'); }
+  .day-card:nth-child(7) .day-emoji { background-image: url('/assets/reference/mood-7.png'); }
+
+  .sidebar-pet-ill .pet-ill-img,
+  .hero-dog-ill .hero-dog-img,
+  .chat-top-dog-wrap .chat-top-dog-img,
+  .comic-cover-box .comic-img,
+  .memory-card-thumb .thumb-img {
+    visibility: visible;
+    width: 100%;
+    height: 100%;
+    object-fit: fill;
+    transform: none;
+  }
+
+  .sidebar-pet-ill,
+  .hero-dog-ill,
+  .chat-top-dog-wrap,
+  .comic-cover-box,
+  .memory-card-thumb {
+    background-image: none;
+  }
+}
+
+/* Browser-native shell: fill the real browser window, not a simulated desktop chrome. */
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  padding: 0;
+  background: var(--surface-canvas);
+}
+
+.app-window {
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.window-controls,
+.win-btn {
+  display: none !important;
+}
+
+.app-header {
+  height: 72px;
+  padding: 16px 24px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  position: relative;
+}
+
+.header-search-bar {
+  position: static;
+  width: min(320px, 42vw);
+  height: 36px;
+  margin-right: 0;
+}
+
+.header-actions {
+  position: static;
+  gap: 14px;
+}
+
+.content-split-layout {
+  min-height: 0;
+  overflow: hidden;
+  align-items: stretch;
+}
+
+.main-left-column {
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 24px;
+}
+
+.app-chat-panel {
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-messages-area {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.chat-quick-prompts,
+.chat-input-bar {
+  flex-shrink: 0;
+}
+
+.hero-welcome-card,
+.comic-card,
+.day-card {
+  flex-shrink: 0;
+}
+
+@media (min-width: 1440px) {
+  .content-split-layout {
+    display: grid;
+    grid-template-columns: minmax(720px, 1fr) 390px;
+    align-items: stretch;
+  }
+
+  .main-left-column,
+  .app-chat-panel {
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+  }
+}
+
+@media (min-width: 1280px) and (max-width: 1439px) {
+  .content-split-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+  }
+
+  .app-chat-panel { width: 340px; height: 100%; }
+  .main-left-column { height: 100%; }
+}
+
+@media (max-width: 1279px) {
+  .header-search-bar {
+    width: min(240px, calc(100% - 160px));
+    right: 118px;
+  }
+}
+
+@media (max-width: 1023px) {
+  .app-header {
+    height: 64px;
+    padding: 12px 16px;
+  }
+
+  .header-search-bar,
+  .header-actions {
+    position: static;
+  }
+
+  .header-search-bar {
+    width: min(280px, 100%);
+  }
+
+  .content-split-layout {
+    overflow-y: auto;
+  }
+
+  .main-left-column,
+  .app-chat-panel {
+    overflow: visible;
+    height: auto;
+  }
+}
