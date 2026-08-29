@@ -36,6 +36,17 @@ class PetCompanionAgent:
         "考过", "查查", "翻翻",
     )
 
+    REFLECTIVE_CUES = (
+        "有什么", "发生了什么", "哪些", "哪件", "哪次", "值得", "为什么",
+        "怎么样", "如何", "是不是", "有没有", "做过", "写过", "说过",
+    )
+
+    PERSONAL_CONTEXT_CUES = (
+        "今天", "今日", "昨天", "昨晚", "前天", "这周", "本周", "这个月", "本月", "这段时间",
+        "开心", "高兴", "难过", "伤心", "焦虑", "疲惫", "累", "心情", "事情", "经历",
+        "生活", "习惯", "工作", "学习", "项目",
+    )
+
     @classmethod
     def should_retrieve_memory(cls, message: str) -> bool:
         msg = message.strip().lower()
@@ -45,7 +56,9 @@ class PetCompanionAgent:
             return False
         if any(cue in msg for cue in cls.RETRIEVAL_CUES):
             return True
-        return False
+        has_reflective_intent = any(cue in msg for cue in cls.REFLECTIVE_CUES)
+        has_personal_context = any(cue in msg for cue in cls.PERSONAL_CONTEXT_CUES)
+        return has_reflective_intent and has_personal_context
 
     def __init__(
         self,

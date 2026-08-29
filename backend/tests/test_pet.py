@@ -91,6 +91,29 @@ def test_generic_mood_does_not_expose_diary_memory_context():
     assert response.referenced_memories == []
 
 
+def test_reflective_today_question_retrieves_diary_context():
+    provider = InspectingProvider()
+    agent = PetCompanionAgent(provider=provider)
+
+    asyncio.run(
+        agent.chat(
+            message="今天有什么值得我高兴的事？",
+            user_nickname="小夏",
+            recent_diaries=[
+                {
+                    "date": "2026-08-30",
+                    "title": "完成项目",
+                    "text": "终于把项目做完了，很有成就感。",
+                    "emotion": "激动 (8/10)",
+                }
+            ],
+        )
+    )
+
+    assert "完成项目" in provider.last_prompt
+    assert "终于把项目做完了" in provider.last_prompt
+
+
 def test_pet_chat_stream_emits_tokens_then_action():
     app = create_app(Settings(
         DATABASE_URL="sqlite+aiosqlite:///:memory:",
