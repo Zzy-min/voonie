@@ -1,0 +1,294 @@
+/* pages/auth/index.wxss */
+.auth-page {
+  background-color: #FAF7F0;
+  min-height: 100vh;
+  padding: 20rpx 44rpx calc(60rpx + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  position: relative;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.auth-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.auth-container {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.brand-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 36rpx;
+}
+
+.brand-logo {
+  font-family: Georgia, serif;
+  font-size: 64rpx;
+  font-weight: bold;
+  color: #3D332A;
+  letter-spacing: 2rpx;
+}
+
+.brand-slogan {
+  font-size: 26rpx;
+  color: #7A6F64;
+  margin-top: 8rpx;
+  letter-spacing: 4rpx;
+}
+
+.dog-sitting-box {
+  position: relative;
+  width: 320rpx;
+  height: 340rpx;
+  margin-top: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dog-sitting-img {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+.auth-card {
+  width: 100%;
+  background-color: #FCFAF6;
+  border-radius: 36rpx;
+  padding: 40rpx 36rpx;
+  box-shadow: 0 10rpx 36rpx rgba(61, 51, 42, 0.06);
+  border: 1rpx solid #EFE3D2;
+}
+
+.auth-segmented {
+  display: flex;
+  background-color: #FAF7F0;
+  border-radius: 9999rpx;
+  padding: 6rpx;
+  margin-bottom: 36rpx;
+  border: 1rpx solid #E8DFD3;
+}
+
+.segment-btn {
+  flex: 1;
+  text-align: center;
+  padding: 14rpx 0;
+  font-size: 28rpx;
+  color: #7A6F64;
+  border-radius: 9999rpx;
+  transition: all 0.2s ease;
+}
+
+.segment-btn.active {
+  background-color: #FFFCF8;
+  color: #3D332A;
+  font-weight: 600;
+  box-shadow: 0 4rpx 12rpx rgba(118, 93, 70, 0.08);
+}
+
+.form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.input-group {
+  display: flex;
+  align-items: center;
+  background-color: #FAF7F0;
+  border: 1rpx solid #E8DFD3;
+  border-radius: 20rpx;
+  height: 92rpx;
+  padding: 0 28rpx;
+  gap: 16rpx;
+}
+
+.input-icon {
+  font-size: 32rpx;
+}
+
+.input-icon-svg {
+  width: 32rpx;
+  height: 32rpx;
+  display: block;
+}
+
+.form-input {
+  flex: 1;
+  height: 100%;
+  font-size: 28rpx;
+  color: #3D332A;
+}
+
+.form-extras {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 24rpx;
+  font-size: 24rpx;
+  color: #7A6F64;
+}
+
+.remember-box {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.checkbox {
+  width: 32rpx;
+  height: 32rpx;
+  border: 2rpx solid #ABA094;
+  border-radius: 6rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20rpx;
+  color: #FFFFFF;
+}
+
+.checkbox.checked {
+  background-color: #D9845B;
+  border-color: #D9845B;
+}
+
+.forget-link {
+  color: #7A6F64;
+}
+
+.eye-toggle-btn {
+  padding: 10rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.eye-icon {
+  width: 36rpx;
+  height: 36rpx;
+}
+
+.auth-submit-btn {
+  width: 100%;
+  margin-top: 36rpx;
+  background: linear-gradient(135deg, #5A4332 0%, #3D332A 100%);
+  color: #FFFFFF;
+  border-radius: 9999rpx;
+  height: 92rpx;
+  line-height: 92rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  box-shadow: 0 8rpx 22rpx rgba(61, 51, 42, 0.22);
+}
+
+/* 社交登录 */
+.social-login-section {
+  margin-top: 32rpx;
+}
+
+.divider-line {
+  position: relative;
+  text-align: center;
+  margin-bottom: 24rpx;
+}
+
+.divider-line::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1rpx;
+  background-color: #E8DFD3;
+  z-index: 1;
+}
+
+.divider-text {
+  position: relative;
+  background-color: #FCFAF6;
+  padding: 0 20rpx;
+  font-size: 22rpx;
+  color: #ABA094;
+  z-index: 2;
+}
+
+.social-icons {
+  display: flex;
+  justify-content: center;
+  gap: 28rpx;
+}
+
+.social-btn {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 14rpx 36rpx;
+  border-radius: 9999rpx;
+  border: 1rpx solid #E8DFD3;
+  background-color: #FAF7F0;
+  transition: transform 0.15s ease;
+}
+
+.social-btn-hover {
+  transform: scale(0.97);
+  background-color: #FFFFFF;
+}
+
+.social-icon-svg {
+  width: 36rpx;
+  height: 36rpx;
+  display: block;
+}
+
+.social-name {
+  font-size: 24rpx;
+  color: #3D332A;
+  font-weight: 500;
+}
+
+/* 对齐案例：立即注册/登录链接 */
+.switch-link-row {
+  margin-top: 24rpx;
+  text-align: center;
+  padding: 8rpx 0;
+}
+
+.switch-link-text {
+  font-size: 24rpx;
+  color: #7A6F64;
+  text-decoration: underline;
+}
+
+/* 协议 */
+.protocol-box {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  margin-top: 28rpx;
+  justify-content: center;
+}
+
+.protocol-text {
+  font-size: 22rpx;
+  color: #ABA094;
+}

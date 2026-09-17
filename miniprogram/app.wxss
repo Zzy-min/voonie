@@ -1,0 +1,263 @@
+/**
+ * Voonie 微信小程序全局样式与 Design Tokens
+ * 视觉定位：把平凡日子温柔珍藏 · 治愈系数字手帐
+ */
+
+page {
+  /* 基础与背景色彩 */
+  --bg-primary: #FAF7F0;        /* 柔和暖米白底色 */
+  --bg-secondary: #F5EFE6;      /* 温暖居室底色 */
+  --bg-surface: #FFFCF8;        /* 暖白（避免刺眼纯白） */
+  --bg-surface-soft: #F6F0E6;   /* 浅杏容器 */
+  --bg-paper: #FCFAF6;         /* 手帐厚宣纸质感 */
+  --bg-paper-dark: #F3ECE1;    /* 封皮与侧栏深纸色 */
+
+  /* 品牌色彩 */
+  --primary: #D9845B;           /* 暖焦糖 / 日落橙 */
+  --primary-hover: #C87444;     /* 加深色 */
+  --primary-pressed: #B86234;   /* 按压色 */
+  --primary-light: #FDF3EB;     /* 浅色高亮 */
+  --accent-fur: #E4A968;        /* 小狗毛色金黄 */
+  --accent-scarf: #C26741;      /* 小狗领巾暖红 */
+  --accent-heart: #E07A5F;      /* 情绪红心 */
+  --accent-green: #819875;      /* 治愈草木绿 */
+
+  /* 文字色彩 */
+  --text-primary: #3D332A;      /* 深暖炭褐 */
+  --text-secondary: #7A6F64;    /* 中度暖灰 */
+  --text-muted: #ABA094;        /* 浅咖辅助字 */
+  --text-inverse: #FFFFFF;
+
+  /* 边框与阴影 */
+  --border-soft: #E8DFD3;       /* 细浅米咖线 */
+  --border-light: #F0E9DF;
+  --shadow-soft: 0 6rpx 24rpx rgba(118, 93, 70, 0.055);
+  --shadow-float: 0 10rpx 36rpx rgba(61, 51, 42, 0.08);
+  --shadow-book: 0 12rpx 36rpx rgba(78, 62, 48, 0.10);
+
+  /* 圆角规范 */
+  --radius-xs: 8rpx;
+  --radius-sm: 16rpx;
+  --radius-md: 24rpx;
+  --radius-lg: 40rpx;
+  --radius-xl: 48rpx;
+  --radius-pill: 9999rpx;
+
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  font-size: 28rpx;
+  line-height: 1.5;
+  box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+}
+
+view, text, image, input, textarea, button {
+  box-sizing: border-box;
+}
+
+/* P3-1: 全局清除微信原生 button 的默认细边框 */
+button {
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  line-height: inherit;
+}
+button::after {
+  border: none;
+}
+
+/* 常用容器与排版 */
+.voonie-page {
+  min-height: 100vh;
+  background-color: var(--bg-primary);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  padding-bottom: calc(140rpx + env(safe-area-inset-bottom));
+}
+
+.voonie-page--no-tab {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 按钮规范 */
+.btn-primary {
+  background-color: var(--primary);
+  color: #ffffff;
+  font-size: 32rpx;
+  font-weight: 500;
+  border-radius: var(--radius-pill);
+  height: 96rpx;
+  line-height: 96rpx;
+  text-align: center;
+  box-shadow: 0 8rpx 24rpx rgba(217, 132, 91, 0.22);
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+}
+
+.btn-primary:active {
+  background-color: var(--primary-pressed);
+  transform: scale(0.98);
+}
+
+.btn-secondary {
+  background-color: var(--bg-surface-soft);
+  color: var(--text-primary);
+  font-size: 28rpx;
+  font-weight: 500;
+  border-radius: var(--radius-pill);
+  height: 80rpx;
+  line-height: 80rpx;
+  text-align: center;
+  border: 1rpx solid var(--border-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-secondary:active {
+  background-color: #EEE4D4;
+}
+
+/* 药丸胶囊 CTA 按钮 */
+.pill-cta {
+  background-color: var(--bg-surface);
+  border: 2rpx solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  padding: 16rpx 36rpx;
+  box-shadow: var(--shadow-float);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  color: var(--text-primary);
+  font-size: 30rpx;
+  font-weight: 500;
+}
+
+.pill-cta:active {
+  transform: scale(0.97);
+  background-color: #FAF5ED;
+}
+
+/* 胶囊标签 Tag */
+.badge-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 8rpx 20rpx;
+  border-radius: var(--radius-pill);
+  background-color: var(--bg-surface-soft);
+  color: var(--text-secondary);
+  font-size: 24rpx;
+  border: 1rpx solid var(--border-soft);
+}
+
+/* 手帐纸张与卡片质感 */
+.paper-card {
+  background-color: var(--bg-paper);
+  border: 1rpx solid var(--border-soft);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
+  padding: 24rpx;
+  position: relative;
+}
+
+/* 安全区适配 */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 呼吸动画 */
+@keyframes dogBreathe {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-6rpx) scale(1.02);
+  }
+}
+
+.anim-breathe {
+  animation: dogBreathe 3.6s ease-in-out infinite;
+}
+
+/* 脉冲光环 */
+@keyframes recordPulse {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 0.3;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+}
+
+.anim-pulse {
+  animation: recordPulse 2s ease-in-out infinite;
+}
+
+/* SVG 图标通用工具类 */
+.svg-icon {
+  width: 36rpx;
+  height: 36rpx;
+  display: block;
+}
+
+.svg-icon-sm {
+  width: 28rpx;
+  height: 28rpx;
+  display: block;
+}
+
+.svg-icon-md {
+  width: 40rpx;
+  height: 40rpx;
+  display: block;
+}
+
+.svg-icon-lg {
+  width: 48rpx;
+  height: 48rpx;
+  display: block;
+}
+
+/* 柔和阴影 */
+.soft-shadow {
+  box-shadow: 0 8rpx 28rpx rgba(118, 93, 70, 0.07);
+}
+
+/* Voonie IP 吉祥物统一规范：色温、阴影与笔触一致 */
+.voonie-mascot {
+  display: block;
+  object-fit: contain;
+  filter: drop-shadow(0 8rpx 18rpx rgba(118, 93, 70, 0.14));
+}
+
+.voonie-mascot--hero {
+  filter: drop-shadow(0 14rpx 28rpx rgba(118, 93, 70, 0.18));
+}
+
+.voonie-mascot--scene {
+  filter: drop-shadow(0 10rpx 22rpx rgba(118, 93, 70, 0.16));
+}
+
+.voonie-mascot--avatar {
+  border-radius: 50%;
+  box-shadow: 0 4rpx 14rpx rgba(118, 93, 70, 0.10);
+}
+
+/* 手绘纸张质感与边缘光 */
+.paper-elevation {
+  background-color: var(--bg-paper);
+  border: 1rpx solid var(--border-soft);
+  box-shadow: 0 8rpx 24rpx rgba(118, 93, 70, 0.06), inset 0 0 0 1rpx rgba(255, 252, 246, 0.85);
+}

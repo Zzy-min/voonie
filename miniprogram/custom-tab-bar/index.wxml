@@ -1,0 +1,45 @@
+<!-- custom-tab-bar/index.wxml -->
+<view class="tab-bar-container">
+  <view class="tab-bar">
+    <!-- 1. 首页 -->
+    <view class="tab-item {{selected === 0 ? 'active' : ''}}" data-index="0" data-path="/pages/index/index" bindtap="switchTab">
+      <view class="tab-icon">
+        <image class="tab-icon-img" src="{{selected === 0 ? '/assets/icons/tab-home-active.svg' : '/assets/icons/tab-home.svg'}}" mode="aspectFit" />
+      </view>
+      <text class="tab-label">首页</text>
+    </view>
+
+    <!-- 2. 日记 / 手帐本 -->
+    <view class="tab-item {{selected === 1 ? 'active' : ''}}" data-index="1" data-path="/pages/diary-home/index" bindtap="switchTab">
+      <view class="tab-icon">
+        <image class="tab-icon-img" src="{{selected === 1 ? '/assets/icons/tab-diary-active.svg' : '/assets/icons/tab-diary.svg'}}" mode="aspectFit" />
+      </view>
+      <text class="tab-label">日记</text>
+    </view>
+
+    <!-- 3. 核心大圆凸起萌宠按键 -->
+    <view class="tab-item tab-record-item {{selected === 2 ? 'active' : ''}}" data-index="2" data-path="/pages/pet/index" bindtap="switchTab">
+      <view wx:if="{{selected === 2}}" class="record-btn-glow"></view>
+      <view class="record-btn">
+        <image class="paw-icon-img" src="/assets/icons/tab-pet.svg" mode="aspectFit" />
+      </view>
+      <text class="tab-label record-label">萌宠</text>
+    </view>
+
+    <!-- 4. 书架 / 绘本架 -->
+    <view class="tab-item {{selected === 3 ? 'active' : ''}}" data-index="3" data-path="/pages/bookshelf/index" bindtap="switchTab">
+      <view class="tab-icon">
+        <image class="tab-icon-img" src="{{selected === 3 ? '/assets/icons/tab-bookshelf-active.svg' : '/assets/icons/tab-bookshelf.svg'}}" mode="aspectFit" />
+      </view>
+      <text class="tab-label">书架</text>
+    </view>
+
+    <!-- 5. 我的 -->
+    <view class="tab-item {{selected === 4 ? 'active' : ''}}" data-index="4" data-path="/pages/profile/index" bindtap="switchTab">
+      <view class="tab-icon">
+        <image class="tab-icon-img" src="{{selected === 4 ? '/assets/icons/tab-profile-active.svg' : '/assets/icons/tab-profile.svg'}}" mode="aspectFit" />
+      </view>
+      <text class="tab-label">我的</text>
+    </view>
+  </view>
+</view>

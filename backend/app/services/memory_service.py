@@ -42,19 +42,20 @@ class MemoryService:
         limit: int = 5,
         now: datetime | None = None,
     ) -> list[MemoryContextItem]:
-        user = await db.get(User, user_id)
-        if user is None:
+        memory_opt_in = await db.scalar(select(User.memory_opt_in).where(User.id == user_id))
+        if not memory_opt_in:
             return []
 
         # 1. Fetch user-scoped DiaryArtifacts
         artifact_stmt = (
-            select(DiaryArtifact)
+            select(DiaryArtifact, DiaryEntry)
             .join(Job, Job.id == DiaryArtifact.job_id)
+            .outerjoin(DiaryEntry, (DiaryEntry.id == DiaryArtifact.entry_id) & (DiaryEntry.user_id == user_id))
             .where(DiaryArtifact.user_id == user_id, Job.status == "done")
             .order_by(DiaryArtifact.created_at.desc())
             .limit(50)
         )
-        artifacts = list((await db.scalars(artifact_stmt)).all())
+        artifact_rows = list((await db.execute(artifact_stmt)).all())
 
         # 2. Fetch user-scoped DiaryEntries
         entry_stmt = (
@@ -76,29 +77,30 @@ class MemoryService:
 
         # Aggregate candidates
         candidates: list[dict] = []
-        for a in artifacts:
+        for a, entry in artifact_rows:
             summary = a.transcript_redacted or a.companion_note or a.title
+            dated = entry.entry_date if entry and entry.entry_date else a.created_at
             candidates.append({
-                "date": a.created_at.date().isoformat() if a.created_at else "",
+                "date": dated.date().isoformat() if dated else "",
                 "title": a.title or "绘本日记",
                 "summary": summary[:200],
                 "emotion": a.emotion_label or "记录",
                 "text_for_search": f"{a.title} {summary} {a.emotion_label}",
                 "embedding": None,
-                "created_at": a.created_at,
+                "created_at": dated,
             })
 
         for e in entries:
             text = e.redacted_text or ""
             emotion_val = e.emotion_json.get("label", "记录") if isinstance(e.emotion_json, dict) else "记录"
             candidates.append({
-                "date": (e.created_at or e.entry_date).date().isoformat() if (e.created_at or e.entry_date) else "",
+                "date": e.entry_date.date().isoformat() if e.entry_date else "",
                 "title": f"手帐日记 ({emotion_val})",
                 "summary": text[:200],
                 "emotion": emotion_val,
                 "text_for_search": f"{text} {emotion_val}",
                 "embedding": None,
-                "created_at": e.created_at or e.entry_date,
+                "created_at": e.entry_date,
             })
 
         for m in memories:

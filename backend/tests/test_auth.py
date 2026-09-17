@@ -271,3 +271,67 @@ def test_production_settings_reject_insecure_or_mock_configuration():
         OPENAI_API_KEY="configured-outside-source-control",
     )
     assert configured.PRODUCTION is True
+
+
+def test_wechat_login_reports_missing_server_configuration(auth_client):
+    response = auth_client.post("/api/v1/auth/wechat", json={"code": "temporary-code"})
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "wechat_login_not_configured"
+
+
+def test_wechat_login_binds_verified_anonymous_user(auth_client, monkeypatch):
+    registered = register_device(auth_client, "wechat-bind-device-001")
+    auth_client.app.state.settings.WECHAT_APP_ID = "test-app-id"
+    auth_client.app.state.settings.WECHAT_APP_SECRET = "test-app-secret"
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"openid": "wx-openid-001", "session_key": "must-not-leak"}
+
+    async def fake_get(self, url, *, params):
+        assert url == "https://api.weixin.qq.com/sns/jscode2session"
+        assert params["js_code"] == "temporary-code"
+        return FakeResponse()
+
+    monkeypatch.setattr("httpx.AsyncClient.get", fake_get)
+    response = auth_client.post(
+        "/api/v1/auth/wechat",
+        headers={"Authorization": f"Bearer {registered['access_token']}"},
+        json={"code": "temporary-code"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["user_id"] == registered["user_id"]
+    assert "session_key" not in response.text
+
+    async def stored_openid():
+        async with auth_client.app.state.db_session_factory() as session:
+            user = await session.get(User, registered["user_id"])
+            return user.wechat_openid
+
+    assert asyncio.run(stored_openid()) == "wx-openid-001"
+
+
+def test_wechat_login_rejects_invalid_exchange_response(auth_client, monkeypatch):
+    auth_client.app.state.settings.WECHAT_APP_ID = "test-app-id"
+    auth_client.app.state.settings.WECHAT_APP_SECRET = "test-app-secret"
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"errcode": 40029, "errmsg": "invalid code"}
+
+    async def fake_get(self, url, *, params):
+        return FakeResponse()
+
+    monkeypatch.setattr("httpx.AsyncClient.get", fake_get)
+    response = auth_client.post("/api/v1/auth/wechat", json={"code": "expired-code"})
+
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "invalid_wechat_code"

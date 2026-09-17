@@ -1,0 +1,82 @@
+<!-- pages/record/index.wxml -->
+<view class="voonie-page voonie-page--no-tab record-page">
+  <!-- 柔和纸质温润场景背景切片（对齐案例第4屏） -->
+  <image class="record-bg" src="/assets/images/ui/ui-bg-record.png" mode="aspectFill" />
+
+  <!-- 顶部导航与温馨文案 -->
+  <view class="record-header" style="padding-top: {{statusBarHeight}}px;">
+    <view class="header-nav" style="height: {{navBarHeight}}px; padding-right: {{navRightPadding}}px;">
+      <view class="back-btn" bindtap="onBack">
+        <image class="back-icon-svg" src="/assets/icons/icon-back.svg" mode="aspectFit" />
+      </view>
+      <view class="header-titles">
+        <text class="record-title">我在听</text>
+        <text class="record-subtitle">慢慢说，Voonie 一直在这里</text>
+      </view>
+    </view>
+
+    <!-- 灵感提示小胶囊 (贴近案例第四屏图文转写气泡) -->
+    <view class="inspiration-box" bindtap="onSwitchInspiration">
+      <view class="inspiration-content">
+        <text class="inspiration-text">{{currentInspiration}}</text>
+        <text class="transcribe-tag">✦ 由图文转写</text>
+      </view>
+      <text class="inspiration-refresh">↺</text>
+    </view>
+  </view>
+
+  <!-- 倾听态小狗与波形 -->
+  <view class="record-stage">
+    <!-- 侧耳倾听小狗 (无白边透明高保真切片) -->
+    <view class="listening-dog-box">
+    <image class="listening-dog-img voonie-mascot voonie-mascot--hero anim-breathe" src="/assets/images/voonie/voonie-listen.png" mode="aspectFit" />
+    </view>
+
+    <!-- 录音活动状态指示，不冒充实时音量波形 -->
+    <view class="waveform-container">
+      <block wx:for="{{waveAmps}}" wx:key="index">
+        <view class="wave-bar {{isRecording && !isPaused ? 'active' : ''}}" style="height: {{item}}rpx;"></view>
+      </block>
+    </view>
+
+    <!-- 计时器 -->
+    <view class="timer-box">
+      <text class="timer-text">{{durationText}}</text>
+    </view>
+
+    <!-- 状态小提示 -->
+    <view class="status-hint">
+      <text wx:if="{{uploadFailed}}">录音已保存在本机，可重新上传</text>
+      <text wx:if="{{isPaused}}">录音已暂停，点击继续</text>
+      <text wx:elif="{{isRecording}}">正在倾听你的声音……</text>
+      <text wx:elif="{{!uploadFailed}}">准备好就可以开始啦</text>
+    </view>
+    <button wx:if="{{uploadFailed}}" class="retry-upload-btn" loading="{{isUploading}}" disabled="{{isUploading}}" bindtap="onRetryUpload">重新上传</button>
+  </view>
+
+  <!-- 底部录音控制器 -->
+  <view class="record-controls-bar">
+    <!-- 左侧：暂停 / 继续 -->
+    <view class="control-action-btn {{!isRecording ? 'disabled' : ''}}" bindtap="onTogglePause"
+      aria-role="button" aria-disabled="{{!isRecording}}"
+      aria-label="{{!isRecording ? '暂停录音，不可用' : (isPaused ? '继续录音' : '暂停录音')}}">
+      <text class="action-icon">{{isPaused ? '▶' : '⏸'}}</text>
+    </view>
+
+    <!-- 中间：大主按键 “结束了” -->
+    <view class="finish-btn-wrap {{isStarting || isUploading ? 'disabled' : ''}}" bindtap="onPrimaryRecordTap"
+      aria-role="button" aria-disabled="{{isStarting || isUploading}}"
+      aria-label="{{isUploading ? '正在上传录音' : (isStarting ? '正在准备录音' : (isRecording ? '结束录音' : '开始录音'))}}">
+      <view class="finish-btn-pulse {{isRecording && !isPaused ? 'anim-pulse' : ''}}"></view>
+      <view class="finish-btn">
+        <text class="finish-label">{{isStarting ? '准备中' : (isRecording ? '结束了' : '开始说')}}</text>
+      </view>
+    </view>
+
+    <!-- 右侧：重新录制 -->
+    <view class="control-action-btn" bindtap="onResetRecord" aria-role="button" aria-label="重新录制">
+      <text class="action-icon">↺</text>
+      <text class="btn-subtext">重新录制</text>
+    </view>
+  </view>
+</view>

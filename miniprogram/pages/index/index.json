@@ -1,0 +1,7 @@
+{
+  "usingComponents": {
+    "pet-chat-drawer": "/components/pet-chat-drawer/index"
+  },
+  "navigationBarTitleText": "Voonie",
+  "navigationStyle": "custom"
+}

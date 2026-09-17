@@ -1,10 +1,12 @@
 import asyncio
+import json
+import logging
 from datetime import datetime, timezone
 
 from fastapi.testclient import TestClient
 
 from voonie.backend.app.core.config import Settings
-from voonie.backend.app.db.models import Base, DiaryEntry, User
+from voonie.backend.app.db.models import Base, DiaryArtifact, DiaryEntry, Job, User
 from voonie.backend.app.main import create_app
 from voonie.backend.app.services.pet_agent import PetCompanionAgent
 
@@ -27,6 +29,11 @@ class InspectingProvider:
         self.last_system = system
         self.last_prompt = prompt
         return {"reply": "小夏，我在这里陪你！", "pet_action": "happy", "referenced_memories": ["2026-08-28"]}
+
+
+class FailingMemoryService:
+    async def search(self, *_args, **_kwargs):
+        raise RuntimeError("私密正文不得进入日志")
 
 
 def test_crisis_message_short_circuits_llm_provider():
@@ -262,3 +269,143 @@ def test_pet_chat_rejects_empty_and_oversized_messages_before_provider_call():
     assert empty.status_code == 422
     assert oversized.status_code == 422
     assert provider.calls == 0
+
+
+def test_should_retrieve_memory_triggers_only_for_history_questions():
+    should = PetCompanionAgent.should_retrieve_memory
+    assert should("我最近主要在烦什么？") is True
+    assert should("我上次提到考试是什么时候？") is True
+    assert should("我最近是不是经常提到工作压力？") is True
+    assert should("我刚才记录了什么？") is True
+    assert should("你好。") is False
+    assert should("今天太阳挺舒服。") is False
+    assert should("陪我聊聊天。") is False
+    assert should("你叫什么名字？") is False
+
+
+def test_pet_chat_logs_one_safe_decision_when_retrieval_search_fails():
+    provider = InspectingProvider()
+    app = create_app(Settings(
+        DATABASE_URL="sqlite+aiosqlite:///:memory:",
+        JWT_SECRET="pet-retrieval-log-test-secret-long-enough",
+        TESTING=True,
+    ))
+    app.state.pet_agent = PetCompanionAgent(provider=provider)
+    app.state.memory_service = FailingMemoryService()
+
+    captured: list[logging.LogRecord] = []
+
+    class CaptureHandler(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            captured.append(record)
+
+    logger = logging.getLogger("voonie.retrieval")
+    handler = CaptureHandler()
+    previous_level = logger.level
+    previous_disabled = logger.disabled
+    previous_global_disable = logging.root.manager.disable
+    logging.disable(logging.NOTSET)
+    logger.disabled = False
+    logger.setLevel(logging.INFO)
+    logger.addHandler(handler)
+    try:
+        with TestClient(app) as client:
+            registered = client.post("/api/v1/auth/register", json={
+                "email": "retrieval-log@example.com",
+                "password": "correct-password",
+                "confirm_password": "correct-password",
+            })
+            assert registered.status_code == 201
+            headers = {"Authorization": f"Bearer {registered.json()['access_token']}"}
+            response = client.post(
+                "/api/v1/pet/chat",
+                headers=headers,
+                json={"message": "我最近主要在烦什么？"},
+            )
+    finally:
+        logger.removeHandler(handler)
+        logger.setLevel(previous_level)
+        logger.disabled = previous_disabled
+        logging.disable(previous_global_disable)
+
+    assert response.status_code == 200
+    raw_messages = [record.getMessage() for record in captured]
+    records = [json.loads(message) for message in raw_messages if '"event":"retrieval_decision"' in message]
+    assert len(records) == 1
+    assert records[0] == {
+        "event": "retrieval_decision",
+        "user_id_hash": records[0]["user_id_hash"],
+        "triggered": True,
+        "reason": "search_error",
+        "candidate_count": 0,
+        "selected_count": 0,
+    }
+    captured_text = "\n".join(raw_messages)
+    assert "私密正文" not in captured_text
+    assert "我最近主要在烦什么" not in captured_text
+
+
+def test_pet_chat_isolates_other_users_diaries():
+    provider = InspectingProvider()
+    app = create_app(Settings(
+        DATABASE_URL="sqlite+aiosqlite:///:memory:",
+        JWT_SECRET="pet-isolation-test-secret-long-enough",
+        TESTING=False,
+        ARQ_INLINE=True,
+    ))
+    app.state.pet_agent = PetCompanionAgent(provider=provider)
+
+    async def create_schema():
+        async with app.state.db_engine.begin() as connection:
+            await connection.run_sync(Base.metadata.create_all)
+    asyncio.run(create_schema())
+
+    with TestClient(app) as client:
+        owner = client.post("/api/v1/auth/register", json={
+            "email": "owner-isolation@example.com",
+            "password": "correct-password",
+            "confirm_password": "correct-password",
+        })
+        other = client.post("/api/v1/auth/register", json={
+            "email": "other-isolation@example.com",
+            "password": "correct-password",
+            "confirm_password": "correct-password",
+        })
+        owner_id = owner.json()["user_id"]
+        other_id = other.json()["user_id"]
+        owner_headers = {"Authorization": f"Bearer {owner.json()['access_token']}"}
+
+        async def seed():
+            async with app.state.db_session_factory() as session:
+                session.add(DiaryEntry(
+                    user_id=owner_id, local_id="owner-secret", entry_date=datetime.now(timezone.utc),
+                    timezone="Asia/Shanghai", input_type="text", redacted_text="我自己的考试压力暗号是青柠灯塔881。",
+                    emotion_json={"label": "焦虑", "intensity": 8}, event_json={}, status="confirmed",
+                ))
+                other_entry_id = "other-entry-isolation"
+                other_job_id = "other-job-isolation"
+                session.add(DiaryEntry(
+                    id=other_entry_id, user_id=other_id, local_id="other-secret",
+                    entry_date=datetime.now(timezone.utc), timezone="Asia/Shanghai", input_type="text",
+                    redacted_text="别人的纽约旅行暗号是紫藤港口229。",
+                    emotion_json={"label": "开心", "intensity": 9}, event_json={}, status="confirmed",
+                ))
+                session.add(Job(
+                    id=other_job_id, user_id=other_id, type="comic", status="done", stage="done", progress=1,
+                    request_json={"entry_id": other_entry_id}, result_json={"entry_id": other_entry_id},
+                ))
+                session.add(DiaryArtifact(
+                    user_id=other_id, job_id=other_job_id, entry_id=other_entry_id, title="别人的纽约旅行",
+                    emotion_label="开心", mood_score=9, companion_note="别人的纽约旅行暗号是紫藤港口229。",
+                    transcript_redacted="别人的纽约旅行暗号是紫藤港口229。",
+                ))
+                await session.commit()
+        asyncio.run(seed())
+        response = client.post("/api/v1/pet/chat", headers=owner_headers, json={
+            "message": "我最近主要在烦什么？我上次提到考试是什么时候？",
+        })
+
+    assert response.status_code == 200
+    assert "紫藤港口229" not in provider.last_prompt
+    assert "别人的纽约旅行" not in provider.last_prompt
+    assert "青柠灯塔881" in provider.last_prompt

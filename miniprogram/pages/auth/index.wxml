@@ -1,0 +1,116 @@
+<!-- pages/auth/index.wxml -->
+<view class="voonie-page voonie-page--no-tab auth-page">
+  <!-- 真实轻纸质/奶油氛围背景切片（对齐案例第1屏） -->
+  <image class="auth-bg" src="/assets/images/ui/ui-bg-login.png" mode="aspectFill" />
+
+  <!-- 顶部状态栏占位 -->
+  <view style="height: {{statusBarHeight}}px;"></view>
+
+  <view class="auth-container">
+    <!-- 品牌头部与大号坐姿小狗形象（对齐案例构图比例） -->
+    <view class="brand-header">
+      <text class="brand-logo">Voonie</text>
+      <text class="brand-slogan">✦ 把平凡日子温柔珍藏 ✦</text>
+      <view class="dog-sitting-box">
+      <image class="dog-sitting-img voonie-mascot voonie-mascot--hero anim-breathe" src="/assets/images/voonie/voonie-sit.png" mode="aspectFit" />
+      </view>
+    </view>
+
+    <!-- 登录 / 注册 卡片 -->
+    <view class="auth-card">
+      <!-- 案例式分段切换 -->
+      <view class="auth-segmented">
+        <view class="segment-btn {{isLogin ? 'active' : ''}}" bindtap="switchMode" data-mode="login">
+          <text>登录</text>
+        </view>
+        <view class="segment-btn {{!isLogin ? 'active' : ''}}" bindtap="switchMode" data-mode="register">
+          <text>注册</text>
+        </view>
+      </view>
+
+      <view class="form-fields">
+        <!-- 昵称（仅注册时显示） -->
+        <view wx:if="{{!isLogin}}" class="input-group">
+          <text class="input-icon">👤</text>
+          <input
+            class="form-input"
+            placeholder="给自己起个温暖的昵称"
+            value="{{nickname}}"
+            bindinput="onNicknameInput"
+            cursor-spacing="16"
+          />
+        </view>
+
+        <!-- 账号字段（对齐案例：单一输入框 邮箱或手机号） -->
+        <view class="input-group">
+          <image class="input-icon-svg" src="/assets/icons/icon-mail.svg" mode="aspectFit" />
+          <input
+            class="form-input"
+            placeholder="邮箱或手机号"
+            value="{{account}}"
+            bindinput="onAccountInput"
+            cursor-spacing="16"
+          />
+        </view>
+
+        <!-- 密码与眼睛可见性切换（对齐案例第1屏） -->
+        <view class="input-group">
+          <image class="input-icon-svg" src="/assets/icons/icon-lock.svg" mode="aspectFit" />
+          <input
+            class="form-input"
+            placeholder="密码"
+            password="{{!showPassword}}"
+            value="{{password}}"
+            bindinput="onPasswordInput"
+            cursor-spacing="16"
+          />
+          <view class="eye-toggle-btn" bindtap="onToggleShowPassword">
+            <image class="input-icon-svg eye-icon" src="{{showPassword ? '/assets/icons/icon-eye.svg' : '/assets/icons/icon-eye-off.svg'}}" mode="aspectFit" />
+          </view>
+        </view>
+      </view>
+
+      <!-- 选项与找回密码 -->
+      <view wx:if="{{isLogin}}" class="form-extras">
+        <view class="remember-box" bindtap="toggleRemember">
+          <view class="checkbox {{rememberMe ? 'checked' : ''}}">
+            <text wx:if="{{rememberMe}}">✓</text>
+          </view>
+          <text class="remember-label">记住我</text>
+        </view>
+        <text class="forget-link" bindtap="onForgetPassword">忘记密码？</text>
+      </view>
+
+      <!-- 主提交按钮 -->
+      <button class="btn-primary auth-submit-btn" loading="{{loading}}" bindtap="onSubmit">
+        <text>{{isLogin ? '登录' : '立即注册'}}</text>
+      </button>
+
+      <!-- 第三方快捷方式 -->
+      <view class="social-login-section">
+        <view class="divider-line">
+          <text class="divider-text">或使用以下方式</text>
+        </view>
+        <view class="social-icons">
+          <view class="social-btn wechat-btn" bindtap="onWeChatFastLogin" hover-class="social-btn-hover">
+            <image class="social-icon-svg" src="/assets/icons/icon-wechat.svg" mode="aspectFit" />
+            <text class="social-name">微信</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 对齐案例链接：还没有账号？立即注册 / 已有账号？立即登录 -->
+      <view class="switch-link-row" bindtap="onToggleMode">
+        <text class="switch-link-text">{{isLogin ? '还没有账号？立即注册' : '已有账号？立即登录'}}</text>
+      </view>
+
+      <!-- 底部协议 -->
+      <view class="protocol-box" bindtap="toggleAgree">
+        <view class="checkbox {{agreed ? 'checked' : ''}}">
+          <text wx:if="{{agreed}}">✓</text>
+        </view>
+        <text class="protocol-text">我已阅读并同意《用户协议》和《隐私政策》</text>
+      </view>
+    </view>
+  </view>
+</view>

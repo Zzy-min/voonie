@@ -25,6 +25,7 @@ class User(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     email: Mapped[str | None] = mapped_column(String(255), unique=True, index=True, nullable=True)
+    wechat_openid: Mapped[str | None] = mapped_column(String(128), unique=True, index=True, nullable=True)
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     device_id: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
     device_secret_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
@@ -243,3 +244,49 @@ class RateLimitCounter(Base):
     scope: Mapped[str] = mapped_column(String(32), nullable=False)
     window_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     count: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+
+
+class SharePost(TimestampMixin, Base):
+    __tablename__ = "share_posts"
+    __table_args__ = (
+        UniqueConstraint("user_id", "artifact_id", name="uq_share_posts_user_artifact"),
+        Index("ix_share_posts_public_created_at", "is_public", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    artifact_id: Mapped[str] = mapped_column(ForeignKey("diary_artifacts.id", ondelete="CASCADE"), nullable=False)
+    caption: Mapped[str] = mapped_column(String(500), nullable=False)
+    tags_json: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    show_location: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", nullable=False)
+    hide_date: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", nullable=False)
+    is_public: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class ShareReaction(TimestampMixin, Base):
+    __tablename__ = "share_reactions"
+    __table_args__ = (
+        UniqueConstraint("post_id", "user_id", "kind", name="uq_share_reactions_post_user_kind"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    post_id: Mapped[str] = mapped_column(ForeignKey("share_posts.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+
+
+class ShareReport(TimestampMixin, Base):
+    __tablename__ = "share_reports"
+    __table_args__ = (
+        UniqueConstraint("reporter_user_id", "post_id", "reason", name="uq_share_reports_reporter_post_reason"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    reporter_user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    post_id: Mapped[str] = mapped_column(ForeignKey("share_posts.id", ondelete="CASCADE"), nullable=False, index=True)
+    reason: Mapped[str] = mapped_column(String(64), nullable=False)
+    detail: Mapped[str | None] = mapped_column(String(500))
+    status: Mapped[str] = mapped_column(String(16), default="submitted", server_default="submitted", nullable=False)

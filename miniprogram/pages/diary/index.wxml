@@ -1,0 +1,89 @@
+<!-- pages/diary/index.wxml -->
+<view class="voonie-page voonie-page--no-tab diary-page">
+  <!-- 顶部状态栏与操作 -->
+  <view class="diary-header" style="padding-top: {{statusBarHeight}}px;">
+    <view class="header-nav" style="height: {{navBarHeight}}px; padding-right: {{navRightPadding}}px;">
+      <view class="nav-back-btn" bindtap="onBack">
+        <image class="back-icon-svg" src="/assets/icons/icon-back.svg" mode="aspectFit" />
+      </view>
+      <text class="header-date">{{diary.date_label || '5月20日 · 星期三'}}</text>
+      <!-- 心情书签 -->
+      <view class="mood-bookmark">
+        <text class="bookmark-star">★</text>
+        <text class="bookmark-text">{{diary.mood || '开心'}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 加载态 -->
+  <view class="diary-state" wx:if="{{loading}}">
+    <view class="voonie-spinner"></view>
+    <text class="diary-state-text">正在翻开手帐…</text>
+  </view>
+
+  <!-- 错误态（可重试） -->
+  <view class="diary-state" wx:elif="{{failed}}">
+    <image class="empty-dog anim-breathe" src="/assets/images/voonie/voonie-sleep.png" mode="aspectFit" />
+    <text class="diary-state-title">这一篇没有加载出来</text>
+    <text class="diary-state-text">网络出了点小状况，请重试看看 🐾</text>
+    <view class="empty-retry" bindtap="onRetry">重新加载</view>
+  </view>
+
+  <!-- 空态 -->
+  <view class="diary-state" wx:elif="{{!diary}}">
+    <text class="diary-state-text">还没有日记，对 Voonie 说说今天的故事吧 🐾</text>
+    <view class="empty-primary" bindtap="onGoRecord">去记录</view>
+  </view>
+
+  <!-- 真实手帐翻页装订书框（含真皮书脊、活页与书签，对齐案例第6屏） -->
+  <view class="book-container" wx:elif="{{diary}}">
+      <image class="diary-book-frame" src="/assets/images/ui/ui-diary-book-frame.png" mode="scaleToFill" />
+
+    <!-- 手帐阅读内容滚动区（翻页时重播动效，key=翻页计数） -->
+    <scroll-view class="book-paper-content page-turn" scroll-y wx:key="turnKey">
+      <!-- 日记大标题 -->
+      <view class="diary-title-box">
+        <text class="diary-title">{{diary.title || '今天遇见了一只小狗'}}</text>
+      </view>
+
+      <!-- 第一段正文 -->
+      <view class="diary-text-paragraph">
+        <text>{{firstParagraph}}</text>
+      </view>
+
+      <!-- 微绘本插图（对齐案例第6屏） -->
+      <view class="comic-illustration-card" bindtap="onPreviewImage">
+            <image class="comic-img" src="{{illustrationUrl || '/assets/images/ui/illust-meadow.png'}}" mode="aspectFill" />
+      </view>
+
+      <!-- 第二段正文 -->
+      <view class="diary-text-paragraph">
+        <text>{{secondParagraph}}</text>
+      </view>
+
+      <!-- 页脚页码 -->
+      <view class="page-number-box">
+        <text class="page-num">{{currentPage}} / {{totalPages}}</text>
+        <text class="next-page-arrow" bindtap="onNextPage">›</text>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 底部浮动工具栏 -->
+  <view class="diary-floating-bar" wx:if="{{diary && !loading && !failed}}">
+    <view class="tool-btn" bindtap="onPrevPage">
+      <text class="tool-arrow">‹</text>
+      <text class="tool-label">上一页</text>
+    </view>
+
+    <view class="tool-btn" bindtap="onEdit">
+      <image class="tool-icon-svg" src="/assets/icons/icon-pen.svg" mode="aspectFit" />
+      <text class="tool-label">编辑</text>
+    </view>
+
+    <view class="tool-btn" bindtap="onShare">
+      <image class="tool-icon-svg" src="/assets/icons/icon-star.svg" mode="aspectFit" />
+      <text class="tool-label">分享给朋友</text>
+    </view>
+  </view>
+</view>

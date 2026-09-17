@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 import uuid
 
-from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Request, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, Request, Response, UploadFile
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -11,12 +11,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from voonie.backend.app.api.deps import get_current_user
 from voonie.backend.app.api.deps import TEST_USER_ID
-from voonie.backend.app.db.models import Base, DiaryArtifact, Job, Panel, User
+from voonie.backend.app.db.models import Base, DiaryArtifact, DiaryEntry, Job, Panel, User
 from voonie.backend.app.db.session import get_db
 from voonie.backend.app.models.schemas import (
     CharacterConfig,
     ComicGenerationResponse,
     ComicPanel,
+    DiaryEditRequest,
     GenerateComicFromTextRequest,
     RegeneratePanelRequest,
     Storyboard,
@@ -25,6 +26,7 @@ from voonie.backend.app.services.audio_duration import (
     AudioMetadataError,
     audio_duration_seconds,
     is_within_audio_duration_limit,
+    resolve_audio_content_type,
 )
 from voonie.backend.app.services.legacy_diary_sanitizer import sanitize_legacy_diary_result
 from voonie.backend.app.workers.comic_job import execute_comic_job
@@ -44,15 +46,16 @@ def normalized_created_at(value: str | None, fallback: datetime) -> str:
     return parsed.astimezone(timezone.utc).isoformat()
 
 
-def compatibility_response(job: Job) -> ComicGenerationResponse:
+def compatibility_response(job: Job, entry: DiaryEntry | None = None) -> ComicGenerationResponse:
     result = sanitize_legacy_diary_result(job.result_json or {}, job.request_json)
+    user_edit = (job.result_json or {}).get("user_edit") or {}
     return ComicGenerationResponse(
         task_id=job.id,
         job_id=job.id,
         entry_id=result.get("entry_id", job.request_json.get("entry_id")),
-        title=result["title"],
+        title=user_edit.get("title") or result["title"],
         raw_transcript=result.get("raw_transcript", job.request_json.get("text", "")),
-        organized_diary=result.get(
+        organized_diary=user_edit.get("content") or result.get(
             "organized_diary",
             result.get("raw_transcript", job.request_json.get("text", "")),
         ),
@@ -70,7 +73,16 @@ def compatibility_response(job: Job) -> ComicGenerationResponse:
         composite_comic_url=result.get("composite_comic_url"),
         companion_note=result["companion_note"],
         created_at=normalized_created_at(result.get("created_at"), job.created_at),
+        edit_version=int(user_edit.get("version") or 0),
+        entry_date=entry.entry_date.isoformat() if entry and entry.entry_date else None,
+        timezone=entry.timezone if entry else None,
+        updated_at=user_edit.get("updated_at") or (job.updated_at.isoformat() if job.updated_at else None),
     )
+
+
+async def diary_entry_for_job(job: Job, db: AsyncSession) -> DiaryEntry | None:
+    entry_id = (job.result_json or {}).get("entry_id") or (job.request_json or {}).get("entry_id")
+    return await db.get(DiaryEntry, entry_id) if entry_id else None
 
 
 def deprecate(response: Response) -> None:
@@ -140,13 +152,43 @@ async def run_compat_job(
 
 
 @router.get("", response_model=list[ComicGenerationResponse])
-async def list_diaries(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    jobs = (await db.scalars(
-        select(Job).join(DiaryArtifact, DiaryArtifact.job_id == Job.id)
+async def list_diaries(
+    limit: int | None = Query(default=None, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    start_date: datetime | None = Query(default=None),
+    end_date: datetime | None = Query(default=None),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    for field_name, value in (("start_date", start_date), ("end_date", end_date)):
+        if value is not None and value.tzinfo is None:
+            raise HTTPException(status_code=422, detail=f"{field_name} must include a UTC offset")
+    if start_date is not None:
+        start_date = start_date.astimezone(timezone.utc)
+    if end_date is not None:
+        end_date = end_date.astimezone(timezone.utc)
+    if start_date is not None and end_date is not None and start_date > end_date:
+        raise HTTPException(status_code=422, detail="start_date must not be after end_date")
+
+    statement = (
+        select(Job, DiaryEntry)
+        .join(DiaryArtifact, DiaryArtifact.job_id == Job.id)
+        .outerjoin(
+            DiaryEntry,
+            (DiaryEntry.id == DiaryArtifact.entry_id) & (DiaryEntry.user_id == current_user.id),
+        )
         .where(Job.user_id == current_user.id, Job.status == "done")
-        .order_by(Job.created_at.desc())
-    )).all()
-    return [compatibility_response(job) for job in jobs]
+        .order_by(Job.created_at.desc(), Job.id.desc())
+        .offset(offset)
+    )
+    if start_date is not None:
+        statement = statement.where(DiaryEntry.entry_date >= start_date)
+    if end_date is not None:
+        statement = statement.where(DiaryEntry.entry_date <= end_date)
+    if limit is not None:
+        statement = statement.limit(limit)
+    rows = (await db.execute(statement)).all()
+    return [compatibility_response(job, entry) for job, entry in rows]
 
 
 @router.get("/{job_id}", response_model=ComicGenerationResponse)
@@ -162,7 +204,47 @@ async def get_diary(
     )
     if job is None:
         raise HTTPException(status_code=404, detail="Diary not found")
-    return compatibility_response(job)
+    return compatibility_response(job, await diary_entry_for_job(job, db))
+
+
+@router.patch("/{job_id}", response_model=ComicGenerationResponse)
+async def edit_diary(
+    job_id: str,
+    payload: DiaryEditRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    job = await db.scalar(
+        select(Job)
+        .join(DiaryArtifact, DiaryArtifact.job_id == Job.id)
+        .where(Job.id == job_id, Job.user_id == current_user.id, Job.status == "done")
+    )
+    if job is None:
+        raise HTTPException(status_code=404, detail="Diary not found")
+    result = dict(job.result_json or {})
+    current_edit = result.get("user_edit") or {}
+    current_version = int(current_edit.get("version") or 0)
+    if payload.expected_version != current_version:
+        raise HTTPException(status_code=409, detail={
+            "code": "edit_conflict",
+            "message": "Diary was edited on another device",
+            "current_version": current_version,
+        })
+    result["user_edit"] = {
+        "title": payload.title,
+        "content": payload.content,
+        "version": current_version + 1,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    job.result_json = result
+    artifact = await db.scalar(select(DiaryArtifact).where(DiaryArtifact.job_id == job.id))
+    if artifact is not None:
+        artifact.title = payload.title
+        artifact.transcript_redacted = payload.content
+        artifact.version += 1
+    await db.commit()
+    await db.refresh(job)
+    return compatibility_response(job, await diary_entry_for_job(job, db))
 
 
 @router.delete("/{job_id}", status_code=204)
@@ -282,7 +364,7 @@ async def regenerate_panel(
     }
     await db.commit()
     await db.refresh(job)
-    return compatibility_response(job)
+    return compatibility_response(job, await diary_entry_for_job(job, db))
 
 
 @router.post("/text-generate", response_model=ComicGenerationResponse)
@@ -318,9 +400,7 @@ async def generate_from_voice(
     idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ):
     deprecate(response)
-    content_type = (audio_file.content_type or "").split(";", 1)[0].strip().lower()
-    if content_type not in request.app.state.settings.ALLOWED_AUDIO_TYPES:
-        raise HTTPException(status_code=415, detail="Unsupported audio MIME type")
+    declared_type = (audio_file.content_type or "").split(";", 1)[0].strip().lower()
     if (
         not request.app.state.asr_service.supports_real_transcription
         and not request.app.state.settings.ALLOW_MOCK_ASR
@@ -340,6 +420,9 @@ async def generate_from_voice(
     audio = b"".join(chunks)
     if not audio:
         raise HTTPException(status_code=400, detail="Empty audio file")
+    content_type = resolve_audio_content_type(declared_type, audio[:16])
+    if content_type not in request.app.state.settings.ALLOWED_AUDIO_TYPES:
+        raise HTTPException(status_code=415, detail="Unsupported audio MIME type")
     if content_type == "audio/wav" and not (audio.startswith(b"RIFF") and audio[8:12] == b"WAVE"):
         raise HTTPException(status_code=415, detail="Audio content does not match its declared type")
     suffix = Path(audio_file.filename or "voice.bin").suffix.lower() or ".bin"

@@ -1,0 +1,230 @@
+/* pages/generation/index.wxss */
+.generation-page {
+  background-color: #FAF7F0;
+  padding: 0 40rpx 60rpx;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  position: relative;
+}
+
+.generation-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.generation-header {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 30rpx 0 20rpx;
+}
+
+.header-texts {
+  display: flex;
+  flex-direction: column;
+}
+
+.main-title {
+  font-size: 40rpx;
+  font-weight: bold;
+  color: #3D332A;
+}
+
+.sub-title {
+  font-size: 26rpx;
+  color: #7A6F64;
+  margin-top: 8rpx;
+}
+
+.skip-btn {
+  background-color: #FFFFFF;
+  border: 1rpx solid #E8DFD3;
+  padding: 8rpx 24rpx;
+  border-radius: 9999rpx;
+}
+
+.skip-text {
+  font-size: 24rpx;
+  color: #7A6F64;
+}
+
+/* 步骤清单卡片 */
+.checklist-card {
+  background-color: #FFFFFF;
+  border: 1rpx solid #E8DFD3;
+  border-radius: 36rpx;
+  padding: 36rpx 32rpx;
+  box-shadow: 0 8rpx 28rpx rgba(61, 51, 42, 0.06);
+  margin-top: 24rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+  position: relative;
+  z-index: 1;
+}
+
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.step-icon-wrap {
+  width: 44rpx;
+  height: 44rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
+  background-color: #FAF7F0;
+  border: 1rpx solid #E8DFD3;
+  color: #ABA094;
+}
+
+.completed .step-icon-wrap {
+  background-color: #D9845B;
+  border-color: #D9845B;
+  color: #FFFFFF;
+}
+
+.in-progress .step-icon-wrap {
+  background-color: #FDF3EB;
+  border-color: #D9845B;
+  color: #D9845B;
+}
+
+.step-name {
+  flex: 1;
+  font-size: 28rpx;
+  color: #3D332A;
+  font-weight: 500;
+}
+
+.step-status {
+  font-size: 24rpx;
+  color: #ABA094;
+}
+
+.completed .step-status {
+  color: #7A6F64;
+}
+
+.highlight {
+  color: #D9845B;
+  font-weight: 600;
+}
+
+/* 进度条 */
+.progress-section {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  margin-top: 16rpx;
+  padding-top: 20rpx;
+  border-top: 1rpx solid #FAF7F0;
+}
+
+.progress-bar-bg {
+  flex: 1;
+  height: 12rpx;
+  background-color: #FAF7F0;
+  border-radius: 9999rpx;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #E4A968 0%, #D9845B 100%);
+  border-radius: 9999rpx;
+  transition: width 0.4s ease;
+}
+
+.progress-text {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #D9845B;
+  width: 60rpx;
+  text-align: right;
+}
+
+/* 伏案写字的木质桌面场景（对齐案例第5屏） */
+.desk-dog-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-top: 20rpx;
+  position: relative;
+  z-index: 1;
+}
+
+.desk-scene-img {
+  width: 580rpx;
+  height: auto;
+  max-height: 400rpx;
+  display: block;
+  filter: drop-shadow(0 8rpx 20rpx rgba(61, 51, 42, 0.12));
+}
+
+.desk-caption {
+  font-size: 26rpx;
+  color: #7A6F64;
+  margin-top: 18rpx;
+  text-align: center;
+  z-index: 1;
+}
+
+/* 生成失败错误态 */
+.failure-card {
+  background: #FFF7F0;
+  border: 2rpx solid #F2D8C0;
+  border-radius: 28rpx;
+  padding: 36rpx;
+  margin: 10rpx 24rpx 30rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.failure-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #C26741;
+  margin-bottom: 12rpx;
+}
+.failure-msg {
+  font-size: 26rpx;
+  color: #7A6F64;
+  text-align: center;
+  line-height: 1.6;
+  margin-bottom: 24rpx;
+}
+.failure-actions {
+  display: flex;
+  gap: 24rpx;
+  align-items: center;
+}
+.failure-retry {
+  background: #D9845B;
+  color: #fff;
+  font-size: 28rpx;
+  border-radius: 999rpx;
+  padding: 16rpx 48rpx;
+  margin: 0;
+}
+.failure-goback {
+  font-size: 28rpx;
+  color: #7A6F64;
+  padding: 16rpx 8rpx;
+}

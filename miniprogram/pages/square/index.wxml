@@ -1,0 +1,80 @@
+<!-- pages/square/index.wxml -->
+<view class="voonie-page voonie-page--no-tab square-page">
+  <!-- 柔和纸质背景切片（对齐案例第9屏） -->
+  <image class="square-bg" src="/assets/images/ui/ui-bg-square.png" mode="aspectFill" />
+
+  <!-- 顶部状态栏与 Tab 切换（对齐案例第9屏） -->
+  <view class="square-header" style="padding-top: {{statusBarHeight}}px;">
+    <view class="header-nav" style="height: {{navBarHeight}}px; padding-right: {{navRightPadding}}px;">
+      <view class="back-btn" bindtap="onBack">
+        <image class="back-icon-svg" src="/assets/icons/icon-back.svg" mode="aspectFit" />
+      </view>
+      <text class="square-main-title">分享广场</text>
+      <view class="search-btn" bindtap="onSearch">
+        <image class="search-icon-svg" src="/assets/icons/icon-search.svg" mode="aspectFit" />
+      </view>
+    </view>
+    <!-- 分类标签切换（推荐/最新） -->
+    <view class="square-tabs-row">
+      <view class="square-tabs">
+        <text class="square-tab-btn {{currentTab === 'recommend' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="recommend">推荐</text>
+        <text class="square-tab-btn {{currentTab === 'latest' ? 'active' : ''}}" bindtap="onSwitchTab" data-tab="latest">最新</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 广场卡片信息流 -->
+  <scroll-view class="square-scroll-body" scroll-y>
+    <view class="empty-shelf" wx:if="{{loading}}"><text>正在翻开广场…</text></view>
+    <view class="empty-shelf" wx:elif="{{failed}}" bindtap="loadPosts"><text>广场暂时走神了，点此重试</text></view>
+    <view class="square-empty" wx:elif="{{!posts.length}}">
+      <image class="square-empty-dog anim-breathe" src="/assets/images/voonie/voonie-peek.png" mode="aspectFit" />
+      <text class="square-empty-title">广场还在等第一篇故事</text>
+      <text class="square-empty-copy">先从书架选一本已经生成的绘本，再决定是否公开分享。</text>
+      <view class="square-empty-action" bindtap="onChooseDiary">从书架选择一本</view>
+    </view>
+    <block wx:for="{{posts}}" wx:key="id">
+      <view class="feed-card">
+        <!-- 头部作者信息 -->
+        <view class="feed-user-bar">
+          <image class="feed-avatar" src="{{item.avatar}}" mode="aspectFill" />
+          <view class="feed-user-meta">
+            <text class="feed-author-name">{{item.author}}</text>
+            <view class="feed-mood-tag">
+              <text>★ {{item.mood}}</text>
+            </view>
+          </view>
+          <view class="feed-more-btn" bindtap="onMoreAction" data-id="{{item.id}}">
+            <text>•••</text>
+          </view>
+        </view>
+
+        <!-- 文字简述 -->
+        <text class="feed-caption">{{item.caption}}</text>
+
+        <!-- 绘本插图 -->
+        <view class="feed-img-wrap" bindtap="onPreview" data-img="{{item.image}}">
+          <image class="feed-img" src="{{item.image}}" mode="aspectFill" />
+        </view>
+
+        <!-- 互动操作栏 -->
+        <view class="feed-action-bar">
+          <view class="action-stat {{item.isLiked ? 'liked' : ''}}" bindtap="onLike" data-id="{{item.id}}">
+            <text class="action-icon">{{item.isLiked ? '❤️' : '🤍'}}</text>
+            <text class="action-count">{{item.likes}}</text>
+          </view>
+
+          <view class="action-stat {{item.isCollected ? 'liked' : ''}}" bindtap="onCollect" data-id="{{item.id}}">
+            <text class="action-icon">{{item.isCollected ? '⭐' : '☆'}}</text>
+            <text class="action-count">{{item.collects}}</text>
+          </view>
+
+          <view class="action-stat" bindtap="onSharePost" data-id="{{item.id}}">
+            <text class="action-icon">↗</text>
+            <text class="action-count">分享</text>
+          </view>
+        </view>
+      </view>
+    </block>
+  </scroll-view>
+</view>

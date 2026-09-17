@@ -1,0 +1,288 @@
+/* pages/record/index.wxss */
+.record-page {
+  background-color: #FAF7F0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 0 40rpx 60rpx;
+  min-height: 100vh;
+  position: relative;
+}
+
+.record-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.record-header {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.header-nav {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  height: 88rpx;
+}
+
+.back-btn {
+  width: 72rpx;
+  height: 72rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.back-icon-svg {
+  width: 36rpx;
+  height: 36rpx;
+  display: block;
+}
+
+.header-titles {
+  display: flex;
+  flex-direction: column;
+}
+
+.record-title {
+  font-size: 38rpx;
+  font-weight: bold;
+  color: #3D332A;
+}
+
+.record-subtitle {
+  font-size: 24rpx;
+  color: #7A6F64;
+  margin-top: 4rpx;
+}
+
+/* 灵感胶囊 (贴近案例图文转写气泡) */
+.inspiration-box {
+  margin-top: 20rpx;
+  align-self: flex-end;
+  background-color: #FFFCF8;
+  border: 1rpx solid #EFE3D2;
+  border-radius: 28rpx;
+  padding: 12rpx 24rpx;
+  box-shadow: 0 4rpx 16rpx rgba(61, 51, 42, 0.06);
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  max-width: 92%;
+}
+
+.inspiration-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+  overflow: hidden;
+}
+
+.inspiration-text {
+  font-size: 24rpx;
+  color: #3D332A;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.transcribe-tag {
+  font-size: 20rpx;
+  color: #D9845B;
+  font-weight: 500;
+}
+
+.inspiration-refresh {
+  font-size: 24rpx;
+  color: #D9845B;
+  flex-shrink: 0;
+  padding: 4rpx 8rpx;
+}
+
+/* 舞台与小狗 */
+.record-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20rpx 0;
+  position: relative;
+  z-index: 1;
+}
+
+.listening-dog-box {
+  width: 420rpx;
+  height: 440rpx;
+  margin-bottom: 30rpx;
+}
+
+.listening-dog-img {
+  width: 100%;
+  height: 100%;
+}
+
+/* 波形 */
+.waveform-container {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  height: 64rpx;
+  margin-bottom: 24rpx;
+}
+
+.wave-bar {
+  width: 8rpx;
+  height: 16rpx;
+  background: linear-gradient(180deg, #E07A5F, #D9845B);
+  border-radius: 9999rpx;
+  transition: height 0.15s ease;
+}
+
+.wave-bar.active {
+  background: linear-gradient(180deg, #E4A968, #D9845B);
+}
+
+@keyframes wave1 { 0%, 100% { height: 16rpx; } 50% { height: 48rpx; } }
+@keyframes wave2 { 0%, 100% { height: 24rpx; } 50% { height: 56rpx; } }
+@keyframes wave3 { 0%, 100% { height: 12rpx; } 50% { height: 40rpx; } }
+@keyframes wave4 { 0%, 100% { height: 32rpx; } 50% { height: 64rpx; } }
+
+.anim-wave-1 { animation: wave1 1.1s infinite ease-in-out; }
+.anim-wave-2 { animation: wave2 0.9s infinite ease-in-out; }
+.anim-wave-3 { animation: wave3 1.3s infinite ease-in-out; }
+.anim-wave-4 { animation: wave4 0.8s infinite ease-in-out; }
+
+.timer-box {
+  margin-bottom: 12rpx;
+}
+
+.timer-text {
+  font-size: 40rpx;
+  font-weight: 600;
+  color: #3D332A;
+  letter-spacing: 2rpx;
+}
+
+.status-hint {
+  font-size: 24rpx;
+  color: #ABA094;
+}
+
+.retry-upload-btn {
+  margin-top: 20rpx;
+  padding: 0 34rpx;
+  line-height: 64rpx;
+  border-radius: 32rpx;
+  background: #5A4332;
+  color: #FFFFFF;
+  font-size: 24rpx;
+}
+
+.retry-upload-btn::after { border: 0; }
+
+/* 底部操作区 */
+.record-controls-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 30rpx 20rpx calc(30rpx + env(safe-area-inset-bottom));
+  position: relative;
+  z-index: 1;
+}
+
+.control-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 110rpx;
+  height: 110rpx;
+  border-radius: 50%;
+  background-color: #FFFFFF;
+  border: 1rpx solid #E8DFD3;
+  box-shadow: 0 6rpx 20rpx rgba(61, 51, 42, 0.06);
+  color: #3D332A;
+}
+
+.control-action-btn:active {
+  transform: scale(0.94);
+  background-color: #FAF5ED;
+}
+
+.control-action-btn.disabled {
+  opacity: 0.32;
+  box-shadow: none;
+}
+
+.control-action-btn.disabled:active {
+  transform: none;
+  background-color: #FFFFFF;
+}
+
+.action-icon {
+  font-size: 36rpx;
+}
+
+.btn-subtext {
+  font-size: 16rpx;
+  color: #7A6F64;
+  margin-top: 2rpx;
+}
+
+/* 核心“结束了”按键 */
+.finish-btn-wrap {
+  position: relative;
+  width: 148rpx;
+  height: 148rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.finish-btn-pulse {
+  position: absolute;
+  width: 164rpx;
+  height: 164rpx;
+  border-radius: 50%;
+  background-color: rgba(61, 51, 42, 0.15);
+}
+
+.finish-btn {
+  width: 136rpx;
+  height: 136rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #5A4332 0%, #3D332A 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10rpx 30rpx rgba(61, 51, 42, 0.35);
+  border: 4rpx solid #FFFFFF;
+  z-index: 2;
+  transition: transform 0.15s ease;
+}
+
+.finish-btn-wrap:active .finish-btn {
+  transform: scale(0.92);
+}
+
+.finish-btn-wrap.disabled {
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+.finish-label {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #FFFFFF;
+}

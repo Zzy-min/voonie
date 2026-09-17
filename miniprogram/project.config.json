@@ -1,0 +1,158 @@
+{
+  "miniprogramRoot": "./",
+  "projectname": "voling-miniprogram",
+  "description": "Voling 微信小程序 - 把平凡日子温柔珍藏",
+  "appid": "wxc57365e385acdbb2",
+  "setting": {
+    "urlCheck": true,
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "preloadBackgroundData": false,
+    "minified": true,
+    "newFeature": true,
+    "coverView": true,
+    "nodeModules": false,
+    "autoAudits": false,
+    "showShadowRootInWxmlPanel": true,
+    "scopeDataCheck": false,
+    "uglifyFileName": false,
+    "checkInvalidKey": true,
+    "checkSiteMap": true,
+    "uploadWithSourceMap": true,
+    "compileHotReLoad": false,
+    "lazyloadPlaceholderEnable": false,
+    "useMultiFrameRuntime": true,
+    "useApiHook": true,
+    "useApiHostProcess": true,
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    },
+    "enableEngineNative": false,
+    "useIsolateContext": true,
+    "userConfirmedBundleSwitch": false,
+    "packNpmManually": false,
+    "packNpmRelationList": [],
+    "minifyWXSS": true,
+    "disableUseStrict": false,
+    "minifyWXML": true,
+    "showES6CompileOption": false,
+    "useCompilerPlugins": [
+      "typescript"
+    ]
+  },
+  "compileType": "miniprogram",
+  "libVersion": "3.3.4",
+  "srcMiniprogramRoot": "./",
+  "packOptions": {
+    "ignore": [
+      {
+        "type": "folder",
+        "value": "qa-evidence"
+      },
+      {
+        "type": "folder",
+        "value": "assets/images/reference"
+      },
+      {
+        "type": "file",
+        "value": "assets/images/reference-ui.png"
+      },
+      {
+        "type": "glob",
+        "value": "**/*.md"
+      },
+      {
+        "type": "glob",
+        "value": "*.md"
+      },
+      {
+        "type": "file",
+        "value": "assets/images/comic-1.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/images/comic-2.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/images/comic-3.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/images/comic-4.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/images/comic_3.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/images/comic_4.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/images/comic_sad.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/images/chat-pet.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/images/hero-pet.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/images/sidebar-pet.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/images/memory.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/images/favicon.ico"
+      },
+      {
+        "type": "glob",
+        "value": "assets/images/avatar-*.png"
+      },
+      {
+        "type": "glob",
+        "value": "assets/images/mood-*.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/images/user_header_avatar.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/images/dog_hero.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/images/dog_chat_top.png"
+      },
+      {
+        "type": "file",
+        "value": "assets/images/dog_sidebar.png"
+      },
+      {
+        "type": "glob",
+        "value": "assets/images/*.png"
+      },
+      {
+        "type": "glob",
+        "value": "assets/images/**/*.webp"
+      }
+    ],
+    "include": []
+  },
+  "editorSetting": {
+    "tabIndent": "insertSpaces",
+    "tabSize": 2
+  }
+}

@@ -1,0 +1,25 @@
+<view class="voonie-page voonie-page--no-tab edit-page">
+  <view class="edit-header" style="padding-top: {{statusBarHeight}}px;">
+    <view class="edit-nav" style="height: {{navBarHeight}}px; padding-right: {{navRightPadding}}px;">
+      <text class="cancel" bindtap="onCancel">取消</text>
+      <text class="nav-title">编辑日记</text>
+      <view class="save {{saving ? 'disabled' : ''}}" bindtap="onSave">{{saving ? '保存中' : '保存'}}</view>
+    </view>
+  </view>
+
+  <view class="loading" wx:if="{{loading}}"><view class="voonie-spinner"></view><text>正在打开草稿…</text></view>
+  <scroll-view class="edit-scroll" scroll-y wx:else>
+    <view class="paper">
+      <text class="field-label">标题</text>
+      <input class="title-input" value="{{title}}" maxlength="80" bindinput="onTitleInput"
+        placeholder="给今天起个名字" adjust-position="{{true}}" cursor-spacing="24" />
+      <view class="counter">{{title.length}}/80</view>
+      <text class="field-label body-label">正文</text>
+      <textarea class="content-input" value="{{content}}" maxlength="20000" bindinput="onContentInput"
+        placeholder="写下想保留的内容" auto-height="{{false}}" adjust-position="{{true}}" cursor-spacing="100" />
+      <view class="counter">{{content.length}}/20000</view>
+    </view>
+    <view class="notice">文字修改只会更新日记正文，不会自动改动或重新生成插图。</view>
+    <view class="draft-note" wx:if="{{draftSaved}}">草稿已保存在本机</view>
+  </scroll-view>
+</view>

@@ -157,6 +157,26 @@ def test_voice_rejects_unsupported_and_oversized_files(entries_client):
     assert list(media_dir.glob("voice_*")) == []
 
 
+def mp4_voice_bytes(timescale: int = 1000, duration: int = 6912) -> bytes:
+    prefix = b"\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isom"
+    mvhd = b"mvhd" + bytes(4) + bytes(8) + timescale.to_bytes(4, "big") + duration.to_bytes(4, "big") + bytes(12)
+    return prefix + mvhd
+
+
+def test_voice_accepts_mp4_container_declared_as_aac(entries_client):
+    client, media_dir = entries_client
+    auth = auth_headers(client, "entry-mp4-aac") | {"Idempotency-Key": "voice-mp4-aac"}
+    response = client.post(
+        "/api/v1/entries/voice",
+        headers=auth,
+        files={"audio_file": ("voice.aac", mp4_voice_bytes(), "audio/aac")},
+        data={"local_id": "voice-mp4-aac", "entry_date": "2026-08-27T10:00:00Z", "timezone": "Asia/Shanghai"},
+    )
+    assert response.status_code == 201
+    assert response.json()["input_type"] == "voice"
+    assert list(media_dir.glob("voice_*")) == []
+
+
 def test_entry_date_requires_utc_offset(entries_client):
     client, _ = entries_client
     headers = auth_headers(client, "entry-naive-date") | {"Idempotency-Key": "naive-date"}
@@ -188,3 +208,25 @@ def test_invalid_analysis_keeps_the_entry_and_marks_failed(entries_client):
     assert response.json()["status"] == "analysis_failed"
     assert response.json()["redacted_text"].startswith("FORCE_INVALID_ANALYSIS")
     assert response.json()["events"]["analysis_error"] == "invalid_json"
+
+
+def mp4_voice_bytes() -> bytes:
+    timescale, duration = 1000, 6912
+    prefix = b"\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isom"
+    mvhd = b"mvhd" + bytes(4) + bytes(8) + timescale.to_bytes(4, "big") + duration.to_bytes(4, "big") + bytes(12)
+    return prefix + mvhd
+
+
+def test_voice_accepts_wechat_mp4_labelled_as_aac(entries_client):
+    client, media_dir = entries_client
+    auth = auth_headers(client, "entry-wechat-aac") | {"Idempotency-Key": "voice-wechat-aac"}
+    response = client.post(
+        "/api/v1/entries/voice",
+        headers=auth,
+        files={"audio_file": ("voice.aac", mp4_voice_bytes(), "audio/aac")},
+        data={"local_id": "voice-wechat-aac", "entry_date": "2026-08-27T10:00:00Z", "timezone": "Asia/Shanghai"},
+    )
+    assert response.status_code == 201
+    assert response.json()["input_type"] == "voice"
+    assert response.json()["redacted_text"]
+    assert list(media_dir.glob("voice_*")) == []

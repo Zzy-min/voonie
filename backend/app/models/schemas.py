@@ -79,6 +79,22 @@ class ComicGenerationResponse(BaseModel):
     composite_comic_url: Optional[str] = None
     companion_note: str
     created_at: str
+    edit_version: int = 0
+    entry_date: Optional[str] = None
+    timezone: Optional[str] = None
+    updated_at: Optional[str] = None
+
+class DiaryEditRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=80)
+    content: str = Field(min_length=1, max_length=20000)
+    expected_version: int = Field(ge=0)
+
+    @field_validator("title", "content")
+    @classmethod
+    def reject_blank_edit(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("value cannot be blank")
+        return value.strip()
 
 class MemoryContextItem(BaseModel):
     happened_date: str

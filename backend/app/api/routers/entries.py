@@ -23,6 +23,7 @@ from voonie.backend.app.services.audio_duration import (
     AudioMetadataError,
     audio_duration_seconds,
     is_within_audio_duration_limit,
+    resolve_audio_content_type,
 )
 
 router = APIRouter(prefix="/entries", tags=["Entries"])
@@ -138,9 +139,7 @@ async def create_voice_entry(
     if entry_date.tzinfo is None or entry_date.utcoffset() is None:
         raise ApiError(422, "invalid_entry_date", "entry_date must include a UTC offset")
     entry_date = entry_date.astimezone(timezone.utc)
-    content_type = (audio_file.content_type or "").split(";", 1)[0].strip().lower()
-    if content_type not in request.app.state.settings.ALLOWED_AUDIO_TYPES:
-        raise ApiError(415, "unsupported_audio_type", "Unsupported audio MIME type")
+    declared_type = (audio_file.content_type or "").split(";", 1)[0].strip().lower()
     if (
         not request.app.state.asr_service.supports_real_transcription
         and not request.app.state.settings.ALLOW_MOCK_ASR
@@ -170,6 +169,9 @@ async def create_voice_entry(
                 output.write(chunk)
         if size == 0:
             raise ApiError(400, "empty_audio", "Audio file is empty")
+        content_type = resolve_audio_content_type(declared_type, bytes(header))
+        if content_type not in request.app.state.settings.ALLOWED_AUDIO_TYPES:
+            raise ApiError(415, "unsupported_audio_type", "Unsupported audio MIME type")
         if content_type == "audio/wav":
             valid_signature = bytes(header).startswith(b"RIFF") and bytes(header)[8:12] == b"WAVE"
             if not valid_signature:
@@ -186,18 +188,20 @@ async def create_voice_entry(
             select(DiaryEntry).where(DiaryEntry.user_id == current_user.id, DiaryEntry.local_id == local_id)
         )
         if existing is not None:
-            if existing.event_json.get("_source_hash") != source_hash:
-                raise ApiError(409, "idempotency_conflict", "local_id was already used for different content")
             if existing.status == "processing":
                 lease = existing.audio_delete_after
                 now = datetime.now(timezone.utc)
                 if lease is not None and lease.tzinfo is None:
                     lease = lease.replace(tzinfo=timezone.utc)
                 if lease is None or lease > now:
+                    if existing.event_json.get("_source_hash") != source_hash:
+                        raise ApiError(409, "idempotency_conflict", "local_id was already used for different content")
                     raise ApiError(409, "entry_processing", "The matching voice entry is still being transcribed")
                 await db.delete(existing)
                 await db.commit()
             else:
+                if existing.event_json.get("_source_hash") != source_hash:
+                    raise ApiError(409, "idempotency_conflict", "local_id was already used for different content")
                 return serialize(existing)
         placeholder = DiaryEntry(
             user_id=current_user.id, local_id=local_id, entry_date=entry_date, timezone=timezone_name,

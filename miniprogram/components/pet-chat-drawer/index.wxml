@@ -1,0 +1,89 @@
+<!-- components/pet-chat-drawer/index.wxml -->
+<view class="drawer-mask {{visible ? 'visible' : ''}}" bindtap="onClose"></view>
+
+<view class="drawer-content {{visible ? 'open' : ''}}">
+  <!-- 顶部探头小狗与抽屉把手（对齐案例第3屏探头互动） -->
+  <view class="dog-peeker-wrap">
+  <image class="dog-peeker-img voonie-mascot voonie-mascot--hero anim-breathe" src="/assets/images/voonie/voonie-peek.png" mode="aspectFit" />
+  </view>
+
+  <view class="drawer-header">
+    <view class="drawer-title-box">
+      <text class="title-main">Voonie</text>
+      <text class="title-lock">🔒</text>
+      <text class="title-sub">私人聊天</text>
+    </view>
+    <view class="drawer-actions">
+      <view class="action-btn" bindtap="onClose">
+        <text class="close-icon">✕</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 对话消息列表 -->
+  <scroll-view class="chat-messages" scroll-y scroll-top="{{scrollTop}}" scroll-with-animation>
+    <view class="msg-item pet-msg">
+      <image class="msg-avatar" src="/assets/images/voonie/voonie-avatar.png" mode="aspectFit" />
+      <view class="msg-bubble pet-bubble">
+        <text>小主人，今天过得怎么样呀？想和我说说什么吗？🐾</text>
+      </view>
+    </view>
+
+    <block wx:for="{{messages}}" wx:key="id">
+      <!-- 用户消息 -->
+      <view wx:if="{{item.role === 'user'}}" class="msg-item user-msg">
+        <view class="msg-bubble user-bubble">
+          <text>{{item.content}}</text>
+        </view>
+      </view>
+
+      <!-- 小狗回复 -->
+      <view wx:else class="msg-item pet-msg">
+          <image class="msg-avatar" src="/assets/images/voonie/voonie-avatar.png" mode="aspectFit" />
+        <view class="msg-bubble pet-bubble">
+          <text>{{item.content}}</text>
+        </view>
+      </view>
+    </block>
+
+    <view wx:if="{{loading}}" class="msg-item pet-msg">
+      <image class="msg-avatar" src="/assets/images/voonie/voonie-avatar.png" mode="aspectFit" />
+      <view class="msg-bubble pet-bubble thinking">
+        <text>Voonie 正在思考中… ✨</text>
+      </view>
+    </view>
+  </scroll-view>
+
+  <!-- 快捷推荐胶囊 (对齐案例第3屏) -->
+  <view class="quick-tags">
+    <view class="tag-chip" bindtap="onSelectTag" data-text="今天有点累，陪我聊聊吧">
+      <text>♡ 陪我聊聊</text>
+    </view>
+    <view class="tag-chip" bindtap="onWriteDiary">
+      <text>☆ 日记一下</text>
+    </view>
+    <view class="tag-chip" bindtap="onWish">
+      <text>♡ 我有点想说</text>
+    </view>
+  </view>
+
+  <!-- 底部输入框 -->
+  <view class="chat-input-bar">
+    <input
+      class="chat-input"
+      placeholder="说点什么..."
+      value="{{inputValue}}"
+      bindinput="onInput"
+      bindconfirm="onSend"
+      confirm-type="send"
+      adjust-position="{{true}}"
+      cursor-spacing="16"
+    />
+    <view class="voice-btn" bindtap="onVoiceClick">
+      <image class="voice-icon-svg" src="/assets/icons/icon-mic.svg" mode="aspectFit" />
+    </view>
+    <view class="send-btn {{inputValue ? 'active' : ''}}" bindtap="onSend">
+      <text class="send-arrow">➔</text>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,239 @@
+/* components/pet-chat-drawer/index.wxss */
+.drawer-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(40, 32, 24, 0.4);
+  backdrop-filter: blur(4rpx);
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.drawer-mask.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.drawer-content {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #FAF7F0;
+  border-radius: 36rpx 36rpx 0 0;
+  box-shadow: 0 -8rpx 40rpx rgba(61, 51, 42, 0.15);
+  z-index: 1001;
+  transform: translateY(100%);
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  max-height: 80vh;
+  padding-bottom: calc(20rpx + env(safe-area-inset-bottom));
+}
+
+.drawer-content.open {
+  transform: translateY(0);
+}
+
+/* 探头小狗 (统一 Voonie 品牌) */
+.dog-peeker-wrap {
+  position: absolute;
+  top: -140rpx;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 190rpx;
+  height: 156rpx;
+  pointer-events: none;
+  z-index: 1002;
+}
+
+.dog-peeker-img {
+  width: 100%;
+  height: 100%;
+}
+
+.drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 32rpx 36rpx 20rpx;
+  border-bottom: 1rpx solid #E8DFD3;
+}
+
+.drawer-title-box {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.title-main {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #3D332A;
+}
+
+.title-lock {
+  font-size: 24rpx;
+  margin: 0 4rpx;
+}
+
+.title-sub {
+  font-size: 24rpx;
+  color: #7A6F64;
+}
+
+.action-btn {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  background-color: #EFE7DA;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #7A6F64;
+}
+
+.chat-messages {
+  height: 480rpx;
+  padding: 24rpx 32rpx;
+}
+
+.msg-item {
+  display: flex;
+  margin-bottom: 24rpx;
+  align-items: flex-start;
+  gap: 16rpx;
+}
+
+.msg-avatar {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  background-color: #F6F0E6;
+  flex-shrink: 0;
+  box-shadow: 0 2rpx 8rpx rgba(118, 93, 70, 0.08);
+}
+
+.msg-bubble {
+  max-width: 75%;
+  padding: 20rpx 28rpx;
+  border-radius: 28rpx;
+  font-size: 28rpx;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.pet-bubble {
+  background-color: #FFFDF8;
+  color: #3D332A;
+  border: 1rpx solid #EFE3D2;
+  border-top-left-radius: 6rpx;
+  box-shadow: 0 2rpx 10rpx rgba(118, 93, 70, 0.04);
+}
+
+.user-msg {
+  justify-content: flex-end;
+}
+
+.user-bubble {
+  background-color: #FBE7D0;
+  color: #5A4633;
+  border: 1rpx solid #F3D5B4;
+  border-top-right-radius: 6rpx;
+  box-shadow: 0 2rpx 10rpx rgba(217, 132, 91, 0.06);
+}
+
+.thinking {
+  color: #7A6F64;
+  font-style: italic;
+}
+
+/* 快捷推荐 */
+.quick-tags {
+  display: flex;
+  gap: 16rpx;
+  padding: 12rpx 32rpx;
+  overflow-x: auto;
+}
+
+.tag-chip {
+  background-color: #FFFFFF;
+  border: 1rpx solid #E8DFD3;
+  border-radius: 9999rpx;
+  padding: 10rpx 24rpx;
+  font-size: 24rpx;
+  color: #7A6F64;
+  white-space: nowrap;
+}
+
+.tag-chip:active {
+  background-color: #FDF3EB;
+  color: #D9845B;
+}
+
+/* 底部输入条 */
+.chat-input-bar {
+  display: flex;
+  align-items: center;
+  padding: 16rpx 32rpx;
+  gap: 16rpx;
+}
+
+.chat-input {
+  flex: 1;
+  height: 80rpx;
+  background-color: #FFFFFF;
+  border: 1rpx solid #E8DFD3;
+  border-radius: 9999rpx;
+  padding: 0 32rpx;
+  font-size: 28rpx;
+  color: #3D332A;
+}
+
+.voice-btn {
+  width: 76rpx;
+  height: 76rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #E4A968 0%, #D9845B 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1rpx solid #FAF7F0;
+  box-shadow: 0 4rpx 14rpx rgba(217, 132, 91, 0.25);
+  flex-shrink: 0;
+}
+
+.voice-btn:active {
+  transform: scale(0.92);
+}
+
+.voice-icon-svg {
+  width: 36rpx;
+  height: 36rpx;
+  display: block;
+}
+
+.send-btn {
+  width: 76rpx;
+  height: 76rpx;
+  border-radius: 50%;
+  background-color: #E8DFD3;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.send-btn.active {
+  background-color: #D9845B;
+}
+
+.send-arrow {
+  font-size: 32rpx;
+  font-weight: bold;
+}

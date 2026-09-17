@@ -152,6 +152,8 @@ def create_app(app_settings: Settings | None = None) -> FastAPI:
     app.include_router(daily.router, prefix=app_settings.API_PREFIX)
     from voonie.backend.app.api.routers import me
     app.include_router(me.router, prefix=app_settings.API_PREFIX)
+    from voonie.backend.app.api.routers import shares
+    app.include_router(shares.router, prefix=app_settings.API_PREFIX)
     app.include_router(diary_router.router, prefix=app_settings.API_PREFIX)
     app.include_router(pet_router.router, prefix=app_settings.API_PREFIX)
 

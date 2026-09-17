@@ -8,10 +8,39 @@ class AudioMetadataError(ValueError):
 
 
 AUDIO_CONTAINER_TAIL_TOLERANCE_SECONDS = 1.0
+AAC_SAMPLE_RATES = (
+    96000, 88200, 64000, 48000, 44100, 32000, 24000,
+    22050, 16000, 12000, 11025, 8000, 7350,
+)
+CANONICAL_AUDIO_TYPES = {
+    "audio/x-wav": "audio/wav",
+    "audio/m4a": "audio/mp4",
+    "audio/x-m4a": "audio/mp4",
+    "audio/x-aac": "audio/aac",
+}
 
 
 def is_within_audio_duration_limit(duration: float, limit: float) -> bool:
     return duration <= limit + AUDIO_CONTAINER_TAIL_TOLERANCE_SECONDS
+
+
+def sniff_audio_content_type(header: bytes) -> str | None:
+    if len(header) >= 12 and header.startswith(b"RIFF") and header[8:12] == b"WAVE":
+        return "audio/wav"
+    if len(header) >= 8 and header[4:8] == b"ftyp":
+        return "audio/mp4"
+    if len(header) >= 4 and header.startswith(b"\x1a\x45\xdf\xa3"):
+        return "audio/webm"
+    if len(header) >= 2 and header[0] == 0xFF and header[1] & 0xF6 == 0xF0:
+        return "audio/aac"
+    return None
+
+
+def resolve_audio_content_type(declared: str, header: bytes) -> str:
+    sniffed = sniff_audio_content_type(header)
+    if sniffed:
+        return sniffed
+    return CANONICAL_AUDIO_TYPES.get(declared, declared)
 
 
 def _vint_size(data: bytes, position: int) -> tuple[int, int]:
@@ -102,16 +131,47 @@ def _mp4_duration(data: bytes) -> float:
     return duration / timescale
 
 
+def _aac_adts_duration(data: bytes) -> float:
+    position = 0
+    total_seconds = 0.0
+    frames = 0
+    while position + 7 <= len(data):
+        if data[position] != 0xFF or data[position + 1] & 0xF6 != 0xF0:
+            raise AudioMetadataError("invalid AAC ADTS sync word")
+        sample_rate_index = (data[position + 2] >> 2) & 0x0F
+        if sample_rate_index >= len(AAC_SAMPLE_RATES):
+            raise AudioMetadataError("invalid AAC sample rate")
+        frame_length = (
+            ((data[position + 3] & 0x03) << 11)
+            | (data[position + 4] << 3)
+            | ((data[position + 5] >> 5) & 0x07)
+        )
+        protection_absent = data[position + 1] & 0x01
+        header_length = 7 if protection_absent else 9
+        if frame_length <= header_length or position + frame_length > len(data):
+            raise AudioMetadataError("truncated AAC ADTS frame")
+        raw_blocks = (data[position + 6] & 0x03) + 1
+        total_seconds += raw_blocks * 1024 / AAC_SAMPLE_RATES[sample_rate_index]
+        frames += 1
+        position += frame_length
+    if frames == 0 or position != len(data) or total_seconds <= 0:
+        raise AudioMetadataError("invalid AAC ADTS stream")
+    return total_seconds
+
+
 def audio_duration_seconds(path: Path, content_type: str) -> float:
-    if content_type == "audio/wav":
+    data = path.read_bytes()
+    canonical_type = resolve_audio_content_type(content_type, data[:64])
+    if canonical_type == "audio/wav":
         try:
             with wave.open(str(path), "rb") as audio:
                 return audio.getnframes() / max(audio.getframerate(), 1)
         except (wave.Error, EOFError) as exc:
             raise AudioMetadataError("invalid WAV audio") from exc
-    data = path.read_bytes()
-    if content_type == "audio/webm":
+    if canonical_type == "audio/webm":
         return _webm_duration(data)
-    if content_type == "audio/mp4":
+    if canonical_type == "audio/mp4":
         return _mp4_duration(data)
+    if canonical_type == "audio/aac":
+        return _aac_adts_duration(data)
     raise AudioMetadataError("unsupported audio container")

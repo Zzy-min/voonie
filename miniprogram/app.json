@@ -1,0 +1,66 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/diary-home/index",
+    "pages/calendar/index",
+    "pages/pet/index",
+    "pages/bookshelf/index",
+    "pages/profile/index",
+    "pages/auth/index",
+    "pages/generation/index",
+    "pages/diary/index",
+    "pages/diary-edit/index",
+    "pages/record/index",
+    "pages/share/index",
+    "pages/square/index"
+  ],
+  "window": {
+    "backgroundTextStyle": "dark",
+    "navigationBarBackgroundColor": "#FAF7F0",
+    "navigationBarTitleText": "Voonie",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#FAF7F0"
+  },
+  "networkTimeout": {
+    "uploadFile": 95000
+  },
+  "tabBar": {
+    "custom": true,
+    "color": "#7A6F64",
+    "selectedColor": "#D9845B",
+    "backgroundColor": "#FAF7F0",
+    "borderStyle": "white",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/diary-home/index",
+        "text": "日记"
+      },
+      {
+        "pagePath": "pages/pet/index",
+        "text": "萌宠"
+      },
+      {
+        "pagePath": "pages/bookshelf/index",
+        "text": "书架"
+      },
+      {
+        "pagePath": "pages/profile/index",
+        "text": "我的"
+      }
+    ]
+  },
+  "permission": {
+    "scope.record": {
+      "desc": "Voonie 需要使用您的麦克风来录制温暖的语音日记并转录"
+    },
+    "scope.writePhotosAlbum": {
+      "desc": "Voonie 需要访问您的相册以保存精美的微绘本手帐卡片"
+    }
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

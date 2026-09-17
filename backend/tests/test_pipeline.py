@@ -89,3 +89,16 @@ def test_voice_generate_rejects_unsupported_audio():
         files={"audio_file": ("fake.m4a", b"not-audio", "audio/m4a")},
     )
     assert response.status_code == 415
+
+
+def test_voice_generate_accepts_mp4_labelled_as_aac():
+    timescale, duration = 1000, 6912
+    payload = b"\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isom"
+    payload += b"mvhd" + bytes(4) + bytes(8) + timescale.to_bytes(4, "big") + duration.to_bytes(4, "big") + bytes(12)
+    response = client.post(
+        "/api/v1/diaries/voice-generate",
+        files={"audio_file": ("voice.aac", payload, "audio/aac")},
+        data={"character_name": "测试员", "appearance_prompt": "cute cartoon dog", "style_preset": "chibi_manga"},
+    )
+    assert response.status_code == 200
+    assert response.json()["title"] != ""

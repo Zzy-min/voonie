@@ -1,0 +1,276 @@
+/* pages/share/index.wxss */
+.share-page {
+  background-color: #FAF7F0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.share-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.share-header {
+  position: relative;
+  z-index: 1;
+  padding: 0 36rpx;
+}
+
+.header-nav {
+  height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cancel-text {
+  font-size: 28rpx;
+  color: #7A6F64;
+}
+
+.nav-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #3D332A;
+}
+
+.publish-btn {
+  background-color: #3D332A;
+  color: #FFFFFF;
+  padding: 10rpx 36rpx;
+  border-radius: 9999rpx;
+  box-shadow: 0 4rpx 14rpx rgba(61, 51, 42, 0.2);
+}
+
+.publish-text {
+  font-size: 26rpx;
+  font-weight: 500;
+}
+
+.share-scroll-body {
+  flex: 1;
+  padding: 20rpx 36rpx 60rpx;
+  position: relative;
+  z-index: 1;
+}
+
+/* 文本卡片 */
+.text-input-card {
+  background-color: #FFFFFF;
+  border-radius: 28rpx;
+  border: 1rpx solid #E8DFD3;
+  padding: 24rpx;
+  margin-bottom: 24rpx;
+}
+
+.mini-author-bar {
+  display: flex;
+  gap: 16rpx;
+  align-items: flex-start;
+}
+
+.mini-avatar {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background-color: #FAF7F0;
+}
+
+.share-textarea {
+  flex: 1;
+  min-height: 140rpx;
+  font-size: 28rpx;
+  line-height: 1.6;
+  color: #3D332A;
+}
+
+.word-counter {
+  text-align: right;
+  font-size: 20rpx;
+  color: #ABA094;
+  margin-top: 12rpx;
+}
+
+/* 插图预览 */
+.illustration-preview-card {
+  position: relative;
+  width: 100%;
+  height: 380rpx;
+  border-radius: 28rpx;
+  overflow: hidden;
+  border: 1rpx solid #E8DFD3;
+  margin-bottom: 28rpx;
+  background-color: #F6F0E6;
+}
+
+.preview-img {
+  width: 100%;
+  height: 100%;
+}
+
+.img-control-btns {
+  position: absolute;
+  bottom: 20rpx;
+  right: 20rpx;
+}
+
+.img-btn {
+  width: 68rpx;
+  height: 68rpx;
+  border-radius: 50%;
+  background-color: rgba(61, 51, 42, 0.6);
+  backdrop-filter: blur(4rpx);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30rpx;
+}
+
+/* 标签行 */
+.tags-section {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  margin-bottom: 36rpx;
+}
+
+.tag-capsule {
+  padding: 10rpx 24rpx;
+  border-radius: 9999rpx;
+  font-size: 24rpx;
+  background-color: #FFFFFF;
+  border: 1rpx solid #E8DFD3;
+  color: #7A6F64;
+}
+
+.tag-capsule.selected {
+  background-color: #FDF3EB;
+  border-color: #F0D4BE;
+  color: #D9845B;
+  font-weight: 500;
+}
+
+.add-tag {
+  color: #ABA094;
+  border-style: dashed;
+}
+
+/* 隐私设置卡片 */
+.privacy-settings-card {
+  background-color: #FCFAF6;
+  border-radius: 28rpx;
+  border: 1rpx solid #EFE3D2;
+  padding: 10rpx 28rpx;
+  margin-bottom: 40rpx;
+}
+
+.setting-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx 0;
+  border-bottom: 1rpx solid #FAF7F0;
+}
+
+.setting-row:last-child {
+  border-bottom: none;
+}
+
+.row-label-wrap {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.row-icon {
+  font-size: 32rpx;
+}
+
+.row-icon-svg {
+  width: 32rpx;
+  height: 32rpx;
+  display: block;
+}
+
+.row-title {
+  font-size: 28rpx;
+  color: #3D332A;
+}
+
+.row-val-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+}
+
+.row-val-text {
+  font-size: 26rpx;
+}
+
+.val-public {
+  color: #D9845B;
+  font-weight: 500;
+}
+
+.val-private {
+  color: #819875;
+  font-weight: 500;
+}
+
+.row-arrow {
+  font-size: 32rpx;
+  color: #ABA094;
+}
+
+.setting-switch {
+  transform: scale(0.85);
+}
+
+/* 底部辅助工具 */
+.bottom-tools-row {
+  display: flex;
+  justify-content: space-around;
+  padding: 20rpx 0;
+  border-top: 1rpx solid #E8DFD3;
+}
+
+.tool-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.tool-icon {
+  font-size: 36rpx;
+}
+
+.tool-name {
+  font-size: 22rpx;
+  color: #7A6F64;
+}
+
+/* 底部右侧陪伴吉祥物（对齐案例第10屏） */
+.share-corner-mascot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10rpx 20rpx 20rpx;
+  pointer-events: none;
+}
+
+.corner-dog-img {
+  width: 140rpx;
+  height: 120rpx;
+  display: block;
+}

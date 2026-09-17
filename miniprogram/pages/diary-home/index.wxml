@@ -1,0 +1,121 @@
+<!-- pages/diary-home/index.wxml - 日记 Tab 根页：手帐封面体验 -->
+<view class="voonie-page journal-page">
+  <!-- 真实手帐环境切片背景（对齐案例第6屏） -->
+  <image class="journal-bg" src="/assets/images/ui/ui-bg-diary-book.png" mode="aspectFill" />
+
+  <!-- 顶部状态栏 -->
+  <view class="journal-header" style="padding-top: {{statusBarHeight}}px;">
+    <view class="header-nav" style="height: {{navBarHeight}}px; padding-right: {{navRightPadding}}px;">
+      <view class="page-title-box">
+        <text class="page-title">日记手帐</text>
+        <text class="page-sub">把平凡日子，一笔一划珍藏</text>
+      </view>
+      <view class="calendar-link" bindtap="onOpenCalendar">
+        <image class="cal-link-svg" src="/assets/icons/tab-bookshelf.svg" mode="aspectFit" />
+        <text class="calendar-link-text">回忆日历</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 加载态 -->
+  <view class="journal-state" wx:if="{{loading}}">
+    <view class="voonie-spinner"></view>
+    <text class="journal-state-text">正在翻开手帐…</text>
+  </view>
+
+  <!-- 失败态（可重试：手帐实体纸质质感） -->
+  <view class="journal-state" wx:elif="{{failed}}">
+    <view class="journal-empty-figure">
+      <image class="journal-empty-dog voonie-mascot voonie-mascot--scene anim-breathe" src="/assets/images/voonie/voonie-sleep.png" mode="aspectFit" />
+    </view>
+    <view class="empty-cover">
+      <view class="empty-cover-rings">
+        <view class="ring-hole"></view>
+        <view class="ring-hole"></view>
+        <view class="ring-hole"></view>
+        <view class="ring-hole"></view>
+        <view class="ring-hole"></view>
+      </view>
+      <text class="empty-cover-title">手帐本正在静候</text>
+      <text class="empty-cover-sub">网络暂时走神了，小狗正守在手帐旁等你。轻点下方按钮，重新翻开今天的温柔篇章 🐾</text>
+    </view>
+    <view class="journal-primary" bindtap="onRetry">
+      <text class="journal-primary-text">重新翻开手帐</text>
+    </view>
+    <view class="journal-secondary" bindtap="onOpenCalendar">
+      <image class="cal-link-svg" src="/assets/icons/tab-bookshelf.svg" mode="aspectFit" />
+      <text class="journal-secondary-text">先看看回忆日历</text>
+    </view>
+  </view>
+
+  <!-- 空态：还没有日记 -->
+  <view class="journal-state" wx:elif="{{!latest}}">
+    <view class="journal-empty-figure">
+        <image class="journal-empty-dog voonie-mascot voonie-mascot--scene anim-breathe" src="/assets/images/voonie/voonie-lie.png" mode="aspectFit" />
+    </view>
+    <view class="empty-cover">
+      <view class="empty-cover-rings">
+        <view class="ring-hole"></view>
+        <view class="ring-hole"></view>
+        <view class="ring-hole"></view>
+        <view class="ring-hole"></view>
+        <view class="ring-hole"></view>
+      </view>
+      <text class="empty-cover-title">空白的日记本</text>
+      <text class="empty-cover-sub">把今天轻轻说给 Voonie，它就会帮你写成一本温柔的小画书。</text>
+    </view>
+    <view class="journal-primary" bindtap="onOpenRecord">
+      <image class="btn-icon-svg" src="/assets/icons/icon-mic.svg" mode="aspectFit" />
+      <text class="journal-primary-text">去记录今天</text>
+    </view>
+    <view class="journal-secondary" bindtap="onOpenCalendar">
+      <image class="cal-link-svg" src="/assets/icons/tab-bookshelf.svg" mode="aspectFit" />
+      <text class="journal-secondary-text">先看看回忆日历</text>
+    </view>
+  </view>
+
+  <!-- 有最近一篇：展示手帐封面/预览 -->
+  <view class="journal-content" wx:else>
+    <!-- 手帐封面预览卡 -->
+    <view class="journal-cover-card anim-breathe" bindtap="onOpenDiary">
+      <view class="cover-spine-rings">
+        <view class="ring-hole"></view>
+        <view class="ring-hole"></view>
+        <view class="ring-hole"></view>
+        <view class="ring-hole"></view>
+        <view class="ring-hole"></view>
+      </view>
+      <view class="cover-inside">
+        <view class="cover-date">{{latest.date_label || '最近一篇'}}</view>
+        <view class="cover-illust">
+            <image class="cover-illust-img" src="{{latest.cover || '/assets/images/ui/illust-meadow.png'}}" mode="aspectFill" />
+        </view>
+        <view class="cover-mood-row">
+          <view class="cover-mood-pill">
+            <text>{{latest.mood || '开心'}}</text>
+          </view>
+        </view>
+        <view class="cover-title-box">
+          <text class="cover-title">{{latest.title || '今天有一只小狗'}}</text>
+        </view>
+        <view class="cover-summary" wx:if="{{latest.summary}}">
+          <text>{{latest.summary}}</text>
+        </view>
+      </view>
+      <view class="cover-open-handle">
+        <text class="cover-open-text">打开这本手帐 ›</text>
+      </view>
+    </view>
+
+    <!-- 主按钮：打开手帐 -->
+    <view class="journal-primary" bindtap="onOpenDiary">
+      <text class="journal-primary-text">打开手帐全文</text>
+    </view>
+
+    <!-- 次要入口：回忆日历 -->
+    <view class="journal-secondary" bindtap="onOpenCalendar">
+      <image class="cal-link-svg" src="/assets/icons/tab-bookshelf.svg" mode="aspectFit" />
+      <text class="journal-secondary-text">翻翻回忆日历</text>
+    </view>
+  </view>
+</view>

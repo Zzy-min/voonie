@@ -8,8 +8,10 @@ import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
+from sqlalchemy import select
+
 from voonie.backend.app.core.config import Settings
-from voonie.backend.app.db.models import Base
+from voonie.backend.app.db.models import Base, DiaryArtifact
 from voonie.backend.app.main import create_app
 from voonie.backend.app.models.schemas import CharacterConfig, ComicPanel
 from voonie.backend.app.services.prompt_builder import build_panel_prompt
@@ -103,6 +105,48 @@ def test_page_count_follows_confirmed_entry_volume():
     assert page_count_for(3) == 4
     assert page_count_for(4) == 6
     assert page_count_for(8) == 8
+
+
+def test_diary_edit_preserves_images_and_rejects_stale_or_foreign_updates(mvp_client):
+    owner = auth_headers(mvp_client, "edit-owner-device")
+    other = auth_headers(mvp_client, "edit-other-device")
+    entry_id = create_entry(
+        mvp_client, owner, "edit-entry", "今天在公园和小狗散步，看见晚霞后心情轻松了很多。",
+        "2026-09-13T10:00:00Z",
+    )
+    queued = mvp_client.post(f"/api/v1/entries/{entry_id}/comic-jobs", headers=owner)
+    assert queued.status_code == 202
+    completed = wait_for_job(mvp_client, queued.json()["job_id"], owner)
+    assert completed["status"] == "done"
+    job_id = queued.json()["job_id"]
+    before = mvp_client.get(f"/api/v1/diaries/{job_id}", headers=owner).json()
+    assert before["entry_date"].startswith("2026-09-13T10:00:00")
+    assert before["timezone"] == "Asia/Shanghai"
+    before_images = [panel.get("image_url") for panel in before["panels"]]
+
+    edited = mvp_client.patch(f"/api/v1/diaries/{job_id}", headers=owner, json={
+        "title": "晚霞散步 🐾", "content": "删掉一句后，留下真正想记住的晚霞。", "expected_version": 0,
+    })
+    assert edited.status_code == 200
+    assert edited.json()["title"] == "晚霞散步 🐾"
+    assert edited.json()["organized_diary"] == "删掉一句后，留下真正想记住的晚霞。"
+    assert edited.json()["edit_version"] == 1
+    assert edited.json()["entry_date"] == before["entry_date"]
+    assert [panel.get("image_url") for panel in edited.json()["panels"]] == before_images
+    async def edited_artifact_text():
+        async with mvp_client.app.state.db_session_factory() as session:
+            artifact = await session.scalar(select(DiaryArtifact).where(DiaryArtifact.job_id == job_id))
+            return artifact.transcript_redacted
+    assert asyncio.run(edited_artifact_text()) == "删掉一句后，留下真正想记住的晚霞。"
+
+    stale = mvp_client.patch(f"/api/v1/diaries/{job_id}", headers=owner, json={
+        "title": "旧版本", "content": "不应覆盖", "expected_version": 0,
+    })
+    assert stale.status_code == 409
+    foreign = mvp_client.patch(f"/api/v1/diaries/{job_id}", headers=other, json={
+        "title": "越权", "content": "不应保存", "expected_version": 1,
+    })
+    assert foreign.status_code == 404
 
 
 def test_entry_comic_job_and_single_panel_retry(mvp_client):

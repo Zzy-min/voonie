@@ -1,0 +1,68 @@
+<!-- pages/index/index.wxml -->
+<view class="voonie-page home-page">
+  <!-- 顶部状态栏与日期导航 -->
+  <view class="home-header" style="padding-top: {{statusBarHeight}}px;">
+    <view class="header-inner" style="height: {{navBarHeight}}px; padding-right: {{navRightPadding}}px;">
+      <view class="date-box">
+        <text class="date-text">{{currentDateStr}}</text>
+      </view>
+      <view class="header-actions">
+        <view class="icon-btn" bindtap="onNotifyClick">
+          <image class="action-icon-svg" src="/assets/icons/icon-bell.svg" mode="aspectFit" />
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 真实居室环境背景切片（对齐案例第二屏：落地百叶暖阳窗、挂画、小狗、地毯与生活小道具） -->
+    <image class="home-room-bg" src="/assets/images/ui/ui-bg-home.png" mode="aspectFill" />
+
+  <!-- 居室主场景与小狗 IP 交互层 -->
+  <view class="home-scene">
+    <!-- 问候气泡（对齐案例第二屏：今天过得怎么样？） -->
+    <view class="greeting-bubble" bindtap="openChat">
+      <text class="bubble-text">今天过得怎么样？</text>
+      <view class="bubble-arrow"></view>
+    </view>
+
+    <!-- 狗与地面道具已在 ui-bg-home 合成图内；此处仅保留点击热区，避免形象重叠 -->
+    <view class="dog-hero-container dog-hero-hotzone" bindtap="onDogTap">
+      <!-- 细腻柔和爱心微反馈，默认隐藏，拒绝原生大 emoji 噪音 -->
+      <view wx:if="{{showHeart}}" class="heart-burst">
+        <view class="heart-shape"></view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 案例式底栏：一体化大圆角胶囊输入条 + 麦克风入口 -->
+  <view class="home-input-bar">
+    <!-- 草稿恢复提示条（弱化下移至输入胶囊正上方，不遮挡居室小狗与地毯） -->
+    <view wx:if="{{hasDraft}}" class="draft-notice" bindtap="onResumeDraft">
+      <text class="draft-icon">✏️</text>
+      <text class="draft-text">未完成草稿 · 点击继续</text>
+      <text class="draft-arrow">➔</text>
+    </view>
+    <view class="home-capsule-bar">
+      <view class="home-capsule-mic" bindtap="onMicTap">
+        <image class="capsule-mic-img" src="/assets/icons/icon-mic.svg" mode="aspectFit" />
+      </view>
+      <input
+        class="home-capsule-input"
+        placeholder="说说今天发生的事"
+        placeholder-class="home-input-placeholder"
+        confirm-type="send"
+        value="{{inputText}}"
+        bindinput="onInput"
+        bindconfirm="onInputSend"
+        adjust-position="{{true}}"
+        cursor-spacing="20"
+      />
+      <view wx:if="{{inputText}}" class="home-capsule-send" bindtap="onInputSend">
+        <text class="capsule-send-arrow">➔</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 挂载快捷聊天抽屉 -->
+  <pet-chat-drawer visible="{{chatVisible}}" bind:close="closeChat" />
+</view>

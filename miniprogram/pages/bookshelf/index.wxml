@@ -1,0 +1,89 @@
+<!-- pages/bookshelf/index.wxml - 书架 / 绘本架 -->
+<view class="voonie-page bookshelf-page">
+  <!-- 柔和纸质背景切片（对齐手帐书架设计语言） -->
+  <image class="bookshelf-bg" src="/assets/images/ui/ui-bg-diary-book.png" mode="aspectFill" />
+
+  <!-- 顶部状态栏与导航 -->
+  <view class="bookshelf-header" style="padding-top: {{statusBarHeight}}px;">
+    <view class="header-nav" style="height: {{navBarHeight}}px; padding-right: {{navRightPadding}}px;">
+      <view class="page-title-box">
+        <text class="page-title">我的书架</text>
+        <text class="page-sub">把自己写过的平凡，一本一本珍藏起来</text>
+      </view>
+      <view class="search-btn" bindtap="onSearch">
+        <image class="search-icon-svg" src="/assets/icons/icon-search.svg" mode="aspectFit" />
+      </view>
+    </view>
+  </view>
+
+  <scroll-view class="bookshelf-scroll" scroll-y bindscrolltolower="onLoadMore" lower-threshold="120">
+    <!-- 回忆日历：书架的核心内容集合入口 -->
+    <view class="shelf-calendar-card" bindtap="onOpenCalendar">
+      <view class="cal-icon-box">
+        <image class="cal-svg" src="/assets/icons/tab-bookshelf.svg" mode="aspectFit" />
+      </view>
+      <view class="cal-info">
+        <text class="cal-title">回忆日历</text>
+        <text class="cal-sub">翻开每一天的平凡，看看都珍藏了什么</text>
+      </view>
+      <text class="cal-arrow">›</text>
+    </view>
+    <view class="shelf-calendar-card square-entry-card" bindtap="onOpenSquare">
+      <view class="cal-icon-box"><text>🐾</text></view>
+      <view class="cal-info"><text class="cal-title">分享广场</text><text class="cal-sub">看看大家公开分享的温暖绘本</text></view>
+      <text class="cal-arrow">›</text>
+    </view>
+
+    <!-- 空态 / 失败态 (书架手帐展示台意象) -->
+    <view wx:if="{{empty}}" class="empty-shelf">
+      <!-- 虚线绘本展示位 -->
+      <view class="shelf-placeholder-grid">
+        <view class="book-placeholder">
+          <view class="slot-inner">
+            <text class="slot-plus">✦</text>
+            <text class="slot-text">待收录绘本</text>
+          </view>
+        </view>
+        <view class="book-placeholder">
+          <view class="slot-inner">
+            <text class="slot-plus">✦</text>
+            <text class="slot-text">日常温柔手帐</text>
+          </view>
+        </view>
+      </view>
+      <!-- 书架托板 -->
+      <view class="shelf-board placeholder-board"></view>
+
+      <view class="empty-illust">
+    <image class="empty-dog voonie-mascot voonie-mascot--scene anim-breathe" src="/assets/images/voonie/voonie-sleep.png" mode="aspectFit" />
+        <text class="empty-z">z Z</text>
+      </view>
+      <text class="empty-title">{{failed ? '书架正在静候' : '书架还空空的'}}</text>
+      <text class="empty-sub" wx:if="{{failed}}">网络出了点小状况，绘本依然完好珍藏在架上 🐾</text>
+      <text class="empty-sub" wx:else>把今天的日常说给 Voonie，就会被温柔画进绘本架里 🐾</text>
+      <view class="empty-retry" wx:if="{{failed}}" bindtap="onRetry">重新整理书架</view>
+    </view>
+
+    <!-- 书架陈列层 -->
+    <block wx:else>
+      <view class="shelf-row">
+        <block wx:for="{{books}}" wx:key="id">
+          <view class="book-item" bindtap="onOpenBook" data-id="{{item.id}}">
+            <view class="book-cover">
+              <image class="cover-img" src="{{item.image}}" mode="aspectFill" />
+              <view class="mood-ribbon">
+                <text>{{item.mood}}</text>
+              </view>
+            </view>
+            <text class="book-title">{{item.title}}</text>
+            <text class="book-date">{{item.date}}</text>
+          </view>
+        </block>
+      </view>
+
+      <!-- 绘本架底板装饰 -->
+      <view class="shelf-board"></view>
+    </block>
+
+  </scroll-view>
+</view>

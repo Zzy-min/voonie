@@ -1,0 +1,385 @@
+/* pages/calendar/index.wxss */
+.calendar-page {
+  background-color: #FAF7F0;
+  min-height: 100vh;
+  position: relative;
+}
+
+.calendar-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.calendar-header {
+  position: relative;
+  z-index: 1;
+  padding: 0 36rpx;
+}
+
+.header-nav {
+  height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12rpx;
+}
+
+.nav-back-btn {
+  width: 64rpx;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.back-icon-svg {
+  width: 34rpx;
+  height: 34rpx;
+  display: block;
+}
+
+.page-title-box {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+.page-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #D9845B;
+  letter-spacing: 2rpx;
+}
+
+/* 日记体系引导横幅 */
+.diary-guide-banner {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  background-color: #FFFFFF;
+  border: 1rpx solid #E8DFD3;
+  border-radius: 24rpx;
+  padding: 18rpx 24rpx;
+  margin-bottom: 12rpx;
+  box-shadow: 0 6rpx 20rpx rgba(118, 93, 70, 0.07);
+}
+
+.guide-icon-svg {
+  width: 40rpx;
+  height: 40rpx;
+  display: block;
+}
+
+.guide-texts {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.guide-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #3D332A;
+}
+
+.guide-sub {
+  font-size: 22rpx;
+  color: #7A6F64;
+  margin-top: 2rpx;
+}
+
+.guide-arrow {
+  font-size: 40rpx;
+  color: #ABA094;
+}
+
+.search-btn {
+  width: 68rpx;
+  height: 68rpx;
+  border-radius: 50%;
+  background-color: #FFFFFF;
+  border: 1rpx solid #E8DFD3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.search-icon-svg {
+  width: 32rpx;
+  height: 32rpx;
+  display: block;
+}
+
+.calendar-scroll-body {
+  flex: 1;
+  padding: 10rpx 36rpx 40rpx;
+  position: relative;
+  z-index: 1;
+}
+
+/* 日历挂纸卡片（对齐案例第7屏挂纸与黄铜夹切片） */
+.calendar-card {
+  position: relative;
+  background-color: #FAF5ED;
+  border-radius: 36rpx;
+  box-shadow: 0 10rpx 32rpx rgba(61, 51, 42, 0.08);
+  padding: 36rpx 24rpx 30rpx;
+  margin-bottom: 36rpx;
+  overflow: hidden;
+}
+
+.calendar-paper-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.month-selector {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 36rpx;
+  margin-bottom: 24rpx;
+  position: relative;
+  z-index: 1;
+}
+
+.weekdays-row {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 16rpx;
+  position: relative;
+  z-index: 1;
+}
+
+.days-grid {
+  display: flex;
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 1;
+}
+
+.month-arrow {
+  font-size: 40rpx;
+  color: #7A6F64;
+  padding: 0 16rpx;
+}
+
+.current-month-text {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #3D332A;
+}
+
+.weekdays-row {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 16rpx;
+}
+
+.weekday-col {
+  width: 14.28%;
+  text-align: center;
+  font-size: 24rpx;
+  color: #ABA094;
+  font-weight: 500;
+}
+
+.days-grid {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.day-cell {
+  width: 14.28%;
+  height: 88rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  margin-bottom: 10rpx;
+}
+
+.day-number-wrap {
+  width: 52rpx;
+  height: 52rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.day-num {
+  font-size: 26rpx;
+  font-weight: 500;
+  color: #3D332A;
+}
+
+.lunar-text {
+  font-size: 16rpx;
+  color: #ABA094;
+  margin-top: -2rpx;
+}
+
+.other-month {
+  opacity: 0.3;
+}
+
+.selected .day-number-wrap {
+  background-color: #D9845B;
+}
+
+.selected .day-num {
+  color: #FFFFFF;
+  font-weight: 600;
+}
+
+.diary-mark {
+  position: absolute;
+  bottom: -4rpx;
+}
+
+.diary-dot {
+  font-size: 16rpx;
+}
+
+/* 回忆列表区 */
+.memories-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.section-title-box {
+  margin-bottom: 24rpx;
+}
+
+.section-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #3D332A;
+}
+
+.memory-cards-grid {
+  display: flex;
+  gap: 24rpx;
+}
+
+.memory-mini-card {
+  flex: 1;
+  background-color: #FFFFFF;
+  border: 1rpx solid #E8DFD3;
+  border-radius: 28rpx;
+  overflow: hidden;
+  box-shadow: 0 6rpx 20rpx rgba(61, 51, 42, 0.06);
+}
+
+.card-thumb-wrap {
+  width: 100%;
+  height: 220rpx;
+  background-color: #F6F0E6;
+}
+
+.card-thumb-img {
+  width: 100%;
+  height: 100%;
+}
+
+.card-info {
+  padding: 16rpx 20rpx;
+}
+
+.card-title {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #3D332A;
+  display: block;
+  margin-bottom: 10rpx;
+}
+
+.card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mood-pill {
+  padding: 4rpx 14rpx;
+  border-radius: 9999rpx;
+  font-size: 20rpx;
+  font-weight: 500;
+}
+
+.mood-warm {
+  background-color: #FDF3EB;
+  color: #D9845B;
+}
+
+.mood-blue {
+  background-color: #F6F0E6;
+  color: #7A6F64;
+}
+
+.card-time {
+  font-size: 20rpx;
+  color: #ABA094;
+}
+
+/* 底部选择胶囊 */
+.filter-pills-row {
+  display: flex;
+  gap: 20rpx;
+  margin-top: 36rpx;
+  margin-bottom: 20rpx;
+}
+
+.filter-pill {
+  background-color: #FFFFFF;
+  border: 1rpx solid #E8DFD3;
+  border-radius: 9999rpx;
+  padding: 10rpx 28rpx;
+  font-size: 24rpx;
+  color: #3D332A;
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.down-arrow {
+  color: #ABA094;
+  font-size: 20rpx;
+}
+
+/* 回忆空态 / 失败重试 */
+.memory-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20rpx 8rpx;
+}
+.memory-empty-text {
+  font-size: 26rpx;
+  color: #A89B8F;
+}
+.memory-retry {
+  margin-top: 20rpx;
+  background: #D9845B;
+  color: #fff;
+  font-size: 26rpx;
+  border-radius: 999rpx;
+  padding: 12rpx 40rpx;
+}

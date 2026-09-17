@@ -1,0 +1,118 @@
+<!-- pages/calendar/index.wxml -->
+<view class="voonie-page voonie-page--no-tab calendar-page">
+  <!-- 柔和纸感背景切片（对齐案例第7屏） -->
+  <image class="calendar-bg" src="/assets/images/ui/ui-bg-calendar.png" mode="aspectFill" />
+
+  <!-- 顶部导航 -->
+  <view class="calendar-header" style="padding-top: {{statusBarHeight}}px;">
+    <view class="header-nav" style="height: {{navBarHeight}}px; padding-right: {{navRightPadding}}px;">
+      <view class="nav-back-btn" bindtap="onBack">
+        <image class="back-icon-svg" src="/assets/icons/icon-back.svg" mode="aspectFit" />
+      </view>
+      <view class="page-title-box">
+        <text class="page-title">+ 回忆时光 +</text>
+      </view>
+      <view class="search-btn" bindtap="onSearchClick">
+        <image class="search-icon-svg" src="/assets/icons/icon-search.svg" mode="aspectFit" />
+      </view>
+    </view>
+    <!-- 回到手帐体系引导（日历已是子页，可回根页） -->
+    <view class="diary-guide-banner" bindtap="onBackToJournal">
+      <image class="guide-icon-svg" src="/assets/icons/tab-bookshelf.svg" mode="aspectFit" />
+      <view class="guide-texts">
+        <text class="guide-title">回到手帐</text>
+        <text class="guide-sub">像翻开回忆手帐，慢慢叙</text>
+      </view>
+      <text class="guide-arrow">›</text>
+    </view>
+  </view>
+
+  <scroll-view class="calendar-scroll-body" scroll-y>
+    <!-- 日历卡片容器（真实挂纸与黄铜夹切片背景，保持动态真实网格） -->
+    <view class="calendar-card">
+    <image class="calendar-paper-bg" src="/assets/images/ui/ui-calendar-paper.png" mode="scaleToFill" />
+      <!-- 月份切换 -->
+      <view class="month-selector">
+        <view class="month-arrow" bindtap="onPrevMonth">‹</view>
+        <text class="current-month-text">{{year}}年{{month}}月</text>
+        <view class="month-arrow" bindtap="onNextMonth">›</view>
+      </view>
+
+      <!-- 星期表头 -->
+      <view class="weekdays-row">
+        <text class="weekday-col">日</text>
+        <text class="weekday-col">一</text>
+        <text class="weekday-col">二</text>
+        <text class="weekday-col">三</text>
+        <text class="weekday-col">四</text>
+        <text class="weekday-col">五</text>
+        <text class="weekday-col">六</text>
+      </view>
+
+      <!-- 日期网格 -->
+      <view class="days-grid">
+        <block wx:for="{{calendarDays}}" wx:key="id">
+          <view
+            class="day-cell {{item.isCurrentMonth ? '' : 'other-month'}} {{item.isSelected ? 'selected' : ''}}"
+            bindtap="onSelectDay"
+            data-day="{{item.day}}"
+            data-is-cur="{{item.isCurrentMonth}}"
+          >
+            <view class="day-number-wrap">
+              <text class="day-num">{{item.day}}</text>
+            </view>
+            <text class="lunar-text">{{item.lunar}}</text>
+            <view wx:if="{{item.hasDiary}}" class="diary-mark">
+              <text class="diary-dot">🐾</text>
+            </view>
+          </view>
+        </block>
+      </view>
+    </view>
+
+    <!-- 当天回忆展示区 -->
+    <view class="memories-section">
+      <view class="section-title-box">
+        <text class="section-title">🐾 {{month}}月{{selectedDate}}日的回忆</text>
+      </view>
+
+      <!-- 回忆微卡片列表 -->
+      <view class="memory-cards-grid" wx:if="{{dayMemories.length > 0}}">
+        <block wx:for="{{dayMemories}}" wx:key="id">
+          <view class="memory-mini-card" bindtap="onOpenDiary" data-id="{{item.id}}">
+            <view class="card-thumb-wrap">
+              <image class="card-thumb-img" src="{{item.image_url || '/assets/images/ui/card-sleep-cushion.png'}}" mode="aspectFill" />
+            </view>
+            <view class="card-info">
+              <text class="card-title">{{item.title}}</text>
+              <view class="card-meta">
+                <view class="mood-pill {{item.mood === '沮丧' ? 'mood-blue' : 'mood-warm'}}">
+                  <text>{{item.mood}}</text>
+                </view>
+                <text class="card-time">{{item.time}}</text>
+              </view>
+            </view>
+          </view>
+        </block>
+      </view>
+      <!-- 空态 / 失败重试 -->
+      <view class="memory-empty" wx:elif="{{dayMemories.length === 0}}">
+        <text class="memory-empty-text" wx:if="{{failed}}">回忆加载失败，请重试 🐾</text>
+        <text class="memory-empty-text" wx:else>这一天还没有回忆，去说说今天的故事吧 🐾</text>
+        <view class="memory-retry" wx:if="{{failed}}" bindtap="onRetryMemories">重新加载</view>
+      </view>
+
+      <!-- 年份/月份快速过滤胶囊 -->
+      <view class="filter-pills-row">
+        <view class="filter-pill" bindtap="onPickYear">
+          <text>{{year}}年</text>
+          <text class="down-arrow">▾</text>
+        </view>
+        <view class="filter-pill" bindtap="onPickMonth">
+          <text>{{month}}月</text>
+          <text class="down-arrow">▾</text>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+</view>

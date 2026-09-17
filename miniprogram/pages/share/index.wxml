@@ -1,0 +1,78 @@
+<!-- pages/share/index.wxml -->
+<view class="voonie-page voonie-page--no-tab share-page">
+  <!-- 柔和纸质背景切片（对齐案例第10屏） -->
+  <image class="share-bg" src="/assets/images/ui/ui-bg-publish.png" mode="aspectFill" />
+
+  <!-- 顶部导航 -->
+  <view class="share-header" style="padding-top: {{statusBarHeight}}px;">
+    <view class="header-nav" style="height: {{navBarHeight}}px; padding-right: {{navRightPadding}}px;">
+      <text class="cancel-text" bindtap="onCancel">取消</text>
+      <text class="nav-title">发布日记</text>
+      <view class="publish-btn" bindtap="onPublish">
+        <text class="publish-text">发布</text>
+      </view>
+    </view>
+  </view>
+
+  <scroll-view class="share-scroll-body" scroll-y>
+    <!-- 文字输入区域 -->
+    <view class="text-input-card">
+      <view class="mini-author-bar">
+      <image class="mini-avatar" src="/assets/images/voonie/voonie-avatar.png" mode="aspectFill" />
+        <textarea
+          class="share-textarea"
+          placeholder="写下今天的温暖心情..."
+          value="{{content}}"
+          bindinput="onTextInput"
+          maxlength="500"
+          auto-height
+          adjust-position="{{true}}"
+          cursor-spacing="20"
+        />
+      </view>
+      <view class="word-counter">
+        <text>{{content.length}}/500</text>
+      </view>
+    </view>
+
+    <!-- 微绘本插图预览与调整（默认使用对齐案例第10屏花田小狗插画） -->
+    <view class="illustration-preview-card">
+        <image class="preview-img" src="{{illustrationUrl || '/assets/images/ui/illust-play-flowers.png'}}" mode="aspectFill" />
+    </view>
+
+    <!-- 案例式标签胶囊行 -->
+    <view class="tags-section">
+      <view class="tag-capsule selected" wx:for="{{tags}}" wx:key="*this"><text># {{item}}</text></view>
+      <view class="tag-capsule add-tag" bindtap="onAddTag">
+        <text>+ 添加标签</text>
+      </view>
+    </view>
+
+    <!-- 隐私与可见范围设置 (核心原则：默认私密，由用户自主决定) -->
+    <view class="privacy-settings-card">
+      <view class="setting-row" bindtap="onSelectVisibility">
+        <view class="row-label-wrap">
+          <image class="row-icon-svg" src="/assets/icons/icon-lock.svg" mode="aspectFit" />
+          <text class="row-title">可见范围</text>
+        </view>
+        <view class="row-val-wrap">
+          <text class="row-val-text {{isPublic ? 'val-public' : 'val-private'}}">{{isPublic ? '公开在广场' : '仅自己可见 (私密)'}}</text>
+          <text class="row-arrow">›</text>
+        </view>
+      </view>
+
+      <view class="setting-row">
+        <view class="row-label-wrap">
+          <text class="row-icon">📅</text>
+          <text class="row-title">隐藏具体日期</text>
+        </view>
+        <switch class="setting-switch" color="#D9845B" checked="{{hideDate}}" bindchange="onToggleHideDate" />
+      </view>
+    </view>
+
+    <!-- 底部角落陪伴吉祥物（对齐案例第10屏右下角小狗） -->
+    <view class="share-corner-mascot">
+  <image class="corner-dog-img anim-breathe" src="/assets/images/voonie/voonie-peek.png" mode="aspectFit" />
+    </view>
+  </scroll-view>
+</view>

@@ -348,3 +348,32 @@ def test_queued_job_can_be_cancelled(jobs_client):
         assert terminal["status"] == "cancelled"
         events = jobs_client.get(f"/api/v1/jobs/{job_id}/events", headers=headers)
         assert "event: cancelled" in events.text
+
+
+def test_failed_job_retry_reuses_same_job_id(jobs_client):
+    headers = auth_headers(jobs_client, "jobs-retry-failed-001")
+    headers["Idempotency-Key"] = "comic-retry-001"
+    created = jobs_client.post("/api/v1/jobs/comic", headers=headers, json={"text": "第一次生成失败后应能用同一任务重试。"})
+    assert created.status_code == 202
+    job_id = created.json()["job_id"]
+    for _ in range(40):
+        status = jobs_client.get(f"/api/v1/jobs/{job_id}", headers=headers).json()["status"]
+        if status in {"done", "failed", "cancelled"}:
+            break
+        time.sleep(0.05)
+
+    async def mark_failed():
+        async with jobs_client.app.state.db_session_factory() as session:
+            job = await session.get(Job, job_id)
+            job.status = "failed"
+            job.stage = "failed"
+            job.error = "timeout"
+            await session.commit()
+    asyncio.run(mark_failed())
+
+    retried = jobs_client.post(f"/api/v1/jobs/{job_id}/retry", headers=headers)
+    assert retried.status_code == 202
+    assert retried.json()["job_id"] == job_id
+    duplicate = jobs_client.post("/api/v1/jobs/comic", headers=headers, json={"text": "第一次生成失败后应能用同一任务重试。"})
+    assert duplicate.status_code == 202
+    assert duplicate.json()["job_id"] == job_id

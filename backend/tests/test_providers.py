@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import importlib.util
 import uuid
 from pathlib import Path
 
@@ -55,7 +56,12 @@ def test_provider_factories_never_use_mock_in_live_mode_without_explicit_opt_in(
     assert isinstance(get_llm_provider(mock_settings), MockLLMProvider)
     assert isinstance(get_asr_provider(unavailable_settings), UnavailableASRProvider)
     assert isinstance(get_asr_provider(mock_settings), MockASRProvider)
-    assert isinstance(get_asr_provider(local_settings), LocalWhisperASRProvider)
+    local_dependencies_available = (
+        importlib.util.find_spec("faster_whisper") is not None
+        and importlib.util.find_spec("opencc") is not None
+    )
+    expected_local_type = LocalWhisperASRProvider if local_dependencies_available else UnavailableASRProvider
+    assert isinstance(get_asr_provider(local_settings), expected_local_type)
     assert isinstance(get_image_provider(mock_settings), MockImageProvider)
     assert isinstance(get_embedding_provider(mock_settings), MockEmbeddingProvider)
     assert isinstance(get_llm_provider(live_settings), OpenAILLMProvider)
@@ -64,7 +70,7 @@ def test_provider_factories_never_use_mock_in_live_mode_without_explicit_opt_in(
     assert isinstance(get_embedding_provider(live_settings), OpenAIEmbeddingProvider)
     assert get_asr_provider(unavailable_settings).supports_real_transcription is False
     assert get_asr_provider(mock_settings).supports_real_transcription is False
-    assert get_asr_provider(local_settings).supports_real_transcription is True
+    assert get_asr_provider(local_settings).supports_real_transcription is local_dependencies_available
     assert get_asr_provider(live_settings).supports_real_transcription is True
 
 

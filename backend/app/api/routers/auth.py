@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import secrets
 
+import httpx
 from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
@@ -28,12 +29,29 @@ from voonie.backend.app.schemas.auth import (
     RefreshRequest,
     TokenResponse,
     UserResponse,
+    WeChatLoginRequest,
 )
 
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+async def optional_authenticated_user(request: Request, db: AsyncSession) -> User | None:
+    authorization = request.headers.get("Authorization", "")
+    bearer_token = authorization[7:] if authorization.lower().startswith("bearer ") else None
+    token = request.cookies.get("voonie_access") or bearer_token
+    if not token:
+        return None
+    try:
+        payload = decode_token(token, "access", request.app.state.settings)
+    except TokenValidationError:
+        return None
+    user = await db.get(User, payload.get("sub"))
+    if user is None or payload.get("ver", 0) != user.auth_version:
+        return None
+    return user
 
 
 async def issue_token_pair(user: User, request: Request, response: Response, db: AsyncSession) -> TokenResponse:
@@ -136,6 +154,71 @@ async def login_by_email(
                 request.app.state.settings.LOGIN_FAILED_HOURLY_LIMIT,
             )
         raise ApiError(status.HTTP_401_UNAUTHORIZED, "invalid_credentials", "邮箱或密码错误，请核对后重试")
+
+    tokens = await issue_token_pair(user, request, response, db)
+    await db.commit()
+    return tokens
+
+
+@router.post("/wechat", response_model=TokenResponse)
+async def login_by_wechat(
+    body: WeChatLoginRequest,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+) -> TokenResponse:
+    settings = request.app.state.settings
+    if not settings.WECHAT_APP_ID or not settings.WECHAT_APP_SECRET:
+        raise ApiError(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "wechat_login_not_configured",
+            "微信快捷登录暂未开放，请继续匿名使用或使用邮箱登录",
+        )
+
+    try:
+        async with httpx.AsyncClient(timeout=settings.WECHAT_LOGIN_TIMEOUT_SECONDS) as client:
+            exchange = await client.get(
+                "https://api.weixin.qq.com/sns/jscode2session",
+                params={
+                    "appid": settings.WECHAT_APP_ID,
+                    "secret": settings.WECHAT_APP_SECRET,
+                    "js_code": body.code,
+                    "grant_type": "authorization_code",
+                },
+            )
+            exchange.raise_for_status()
+            payload = exchange.json()
+    except (httpx.HTTPError, ValueError) as exc:
+        raise ApiError(
+            status.HTTP_502_BAD_GATEWAY,
+            "wechat_service_unavailable",
+            "微信登录服务暂时不可用，请稍后重试",
+        ) from exc
+
+    openid = payload.get("openid") if isinstance(payload, dict) else None
+    if not openid:
+        raise ApiError(
+            status.HTTP_401_UNAUTHORIZED,
+            "invalid_wechat_code",
+            "微信登录凭证无效或已过期，请重试",
+        )
+
+    user = await db.scalar(select(User).where(User.wechat_openid == openid))
+    if user is None:
+        # Only bind an anonymous installation when its signed access token proves ownership.
+        user = await optional_authenticated_user(request, db)
+        if user is None:
+            user = User(wechat_openid=openid, memory_opt_in=settings.MEMORY_OPT_IN_DEFAULT)
+            db.add(user)
+        elif user.wechat_openid and user.wechat_openid != openid:
+            raise ApiError(status.HTTP_409_CONFLICT, "wechat_already_bound", "当前账号已绑定其他微信账号")
+        else:
+            user.wechat_openid = openid
+        try:
+            await db.flush()
+        except IntegrityError as exc:
+            await db.rollback()
+            raise ApiError(status.HTTP_409_CONFLICT, "wechat_login_raced", "微信登录请求冲突，请重试") from exc
 
     tokens = await issue_token_pair(user, request, response, db)
     await db.commit()

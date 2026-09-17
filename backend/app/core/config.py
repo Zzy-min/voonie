@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     TESTING: bool = False
     PRODUCTION: bool = False
     COOKIE_SECURE: bool = False
+    WECHAT_APP_ID: str = ""
+    WECHAT_APP_SECRET: str = ""
+    WECHAT_LOGIN_TIMEOUT_SECONDS: float = 8.0
 
     BASE_DIR: Path = BACKEND_DIR
     TEMP_MEDIA_DIR: Path = BASE_DIR / "temp_media"
@@ -61,9 +64,8 @@ class Settings(BaseSettings):
         "audio/mp4",
         "audio/m4a",
         "audio/x-m4a",
-        "audio/ogg",
-        "audio/opus",
-        "application/octet-stream",
+        "audio/aac",
+        "audio/x-aac",
     }
 
     OPENAI_API_KEY: str = ""

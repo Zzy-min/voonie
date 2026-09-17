@@ -1,4 +1,5 @@
 from datetime import datetime
+import hashlib
 import json
 from typing import Any, Optional
 from zoneinfo import ZoneInfo
@@ -13,9 +14,11 @@ from voonie.backend.app.db.models import DiaryArtifact, DiaryEntry, MemoryItem, 
 from voonie.backend.app.db.session import get_db
 from voonie.backend.app.models.schemas import PetChatRequest, PetChatResponse
 from voonie.backend.app.services.pet_agent import PetCompanionAgent
+import logging
 
 
 router = APIRouter(prefix="/pet", tags=["Pet Companion"])
+retrieval_logger = logging.getLogger("voonie.retrieval")
 
 
 @router.post("/chat")
@@ -52,13 +55,14 @@ async def chat_with_pet(
         )
     ) or 0
 
-    recent_artifacts: list[DiaryArtifact] = []
+    recent_artifacts: list[tuple[DiaryArtifact, DiaryEntry | None]] = []
     recent_entries: list[DiaryEntry] = []
     if current_user.memory_opt_in:
         recent_artifacts = list(
             (
-                await db.scalars(
-                    select(DiaryArtifact)
+                await db.execute(
+                    select(DiaryArtifact, DiaryEntry)
+                    .outerjoin(DiaryEntry, (DiaryEntry.id == DiaryArtifact.entry_id) & (DiaryEntry.user_id == current_user.id))
                     .where(DiaryArtifact.user_id == current_user.id)
                     .order_by(DiaryArtifact.created_at.desc())
                     .limit(5)
@@ -81,8 +85,9 @@ async def chat_with_pet(
     recent_diaries_list: list[dict[str, Any]] = []
     emotions_list: list[str] = []
 
-    for art in recent_artifacts:
-        date_str = art.created_at.strftime("%Y-%m-%d") if art.created_at else ""
+    for art, entry in recent_artifacts:
+        dated = entry.entry_date if entry and entry.entry_date else art.created_at
+        date_str = dated.strftime("%Y-%m-%d") if dated else ""
         recent_diaries_list.append({
             "date": date_str,
             "title": art.title,
@@ -119,15 +124,36 @@ async def chat_with_pet(
     # Client-supplied memory is intentionally ignored because it can be stale, cross-account,
     # or forged and must never be presented to the model as trusted diary history.
     context_items = []
-    if current_user.memory_opt_in and PetCompanionAgent.should_retrieve_memory(req.message):
+    should_retrieve = bool(current_user.memory_opt_in and PetCompanionAgent.should_retrieve_memory(req.message))
+    retrieval_reason = "memory_disabled" if not current_user.memory_opt_in else "no_history_intent"
+    if should_retrieve:
         try:
             context_items = await request.app.state.memory_service.search(db, current_user.id, req.message, limit=5)
+            retrieval_reason = "explicit_history_query" if context_items else "no_candidates"
         except Exception:
             context_items = []
-    if not context_items:
-        context_items = []
-
+            retrieval_reason = "search_error"
     history_list = [h.model_dump(mode="json") for h in req.history] if req.history else None
+
+    # 在调用外部模型前重新从数据库读取隐私开关，避免并发关闭记忆后仍使用旧 ORM 快照。
+    memory_still_enabled = bool(
+        await db.scalar(select(User.memory_opt_in).where(User.id == current_user.id))
+    )
+    if not memory_still_enabled:
+        recent_diaries_list = []
+        context_items = []
+        recent_mood = "平静温和"
+        should_retrieve = False
+        retrieval_reason = "memory_disabled"
+
+    retrieval_logger.info(json.dumps({
+        "event": "retrieval_decision",
+        "user_id_hash": hashlib.sha256(current_user.id.encode()).hexdigest()[:16],
+        "triggered": should_retrieve,
+        "reason": retrieval_reason,
+        "candidate_count": len(context_items),
+        "selected_count": len(context_items),
+    }, separators=(",", ":")))
 
     response = await request.app.state.pet_agent.chat(
         message=req.message,

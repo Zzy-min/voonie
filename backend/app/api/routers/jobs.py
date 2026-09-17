@@ -39,6 +39,52 @@ async def owned_job(db: AsyncSession, job_id: str, user_id: str) -> Job:
     return job
 
 
+
+async def retry_failed_job(request: Request, db: AsyncSession, job: Job) -> JobQueuedResponse:
+    if job.status not in {"failed", "cancelled"}:
+        return JobQueuedResponse(job_id=job.id)
+    job.status = "queued"
+    job.stage = "queued"
+    job.progress = 0
+    job.error = None
+    job.finished_at = None
+    await db.commit()
+    await db.refresh(job)
+    request.state.job_id = job.id
+    if request.app.state.settings.ARQ_INLINE:
+        context = {
+            "session_factory": request.app.state.db_session_factory,
+            "storyboard_agent": request.app.state.storyboard_agent,
+            "image_service": request.app.state.image_service,
+            "composer": request.app.state.composer,
+            "storage": request.app.state.storage,
+            "embedding_provider": request.app.state.embedding_provider,
+        }
+        task = asyncio.create_task(run_inline_comic_job(context, job.id))
+        request.app.state.inline_tasks.add(task)
+        task.add_done_callback(request.app.state.inline_tasks.discard)
+    else:
+        if request.app.state.arq_pool is None:
+            job.status = "failed"
+            job.stage = "failed"
+            job.error = "queue_unavailable"
+            await db.commit()
+            raise ApiError(status.HTTP_503_SERVICE_UNAVAILABLE, "queue_unavailable", "Job queue is unavailable")
+        try:
+            enqueued = await request.app.state.arq_pool.enqueue_job("generate_comic_job", job.id)
+            if enqueued is None:
+                raise RuntimeError("queue rejected job")
+        except Exception as exc:
+            job.status = "failed"
+            job.stage = "failed"
+            job.error = "queue_unavailable"
+            await db.commit()
+            raise ApiError(
+                status.HTTP_503_SERVICE_UNAVAILABLE, "queue_unavailable", "Job queue is unavailable"
+            ) from exc
+    return JobQueuedResponse(job_id=job.id)
+
+
 async def enqueue_comic_job(
     request: Request,
     db: AsyncSession,
@@ -55,6 +101,8 @@ async def enqueue_comic_job(
             select(Job).where(Job.user_id == user_id, Job.idempotency_key == idempotency_key)
         )
         if existing is not None:
+            if existing.status == "failed":
+                return await retry_failed_job(request, db, existing)
             return JobQueuedResponse(job_id=existing.id)
     await request.app.state.rate_limiter.consume(
         db,
@@ -76,6 +124,8 @@ async def enqueue_comic_job(
         )
         if existing is None:
             raise
+        if existing.status in {"failed", "cancelled"}:
+            return await retry_failed_job(request, db, existing)
         return JobQueuedResponse(job_id=existing.id)
     await db.refresh(job)
     request.state.job_id = job.id
@@ -124,6 +174,20 @@ async def create_comic_job(
     return await enqueue_comic_job(
         request, db, current_user, body.model_dump(mode="json"), idempotency_key
     )
+
+
+
+@router.post("/{job_id}/retry", response_model=JobQueuedResponse, status_code=status.HTTP_202_ACCEPTED)
+async def retry_job(
+    job_id: str,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> JobQueuedResponse:
+    job = await owned_job(db, job_id, current_user.id)
+    if job.status not in {"failed", "cancelled"}:
+        return JobQueuedResponse(job_id=job.id)
+    return await retry_failed_job(request, db, job)
 
 
 @router.get("/{job_id}", response_model=JobStatusResponse)
