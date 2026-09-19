@@ -1,4 +1,6 @@
 {
   "navigationBarTitleText": "日记手帐",
-  "navigationStyle": "custom"
+  "navigationStyle": "custom",
+  "enableShareAppMessage": true,
+  "enableShareTimeline": true
 }

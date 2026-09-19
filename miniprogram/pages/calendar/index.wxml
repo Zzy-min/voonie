@@ -27,10 +27,10 @@
     </view>
   </view>
 
-  <scroll-view class="calendar-scroll-body" scroll-y>
-    <!-- 日历卡片容器（真实挂纸与黄铜夹切片背景，保持动态真实网格） -->
+  <scroll-view class="calendar-scroll-body" scroll-y scroll-top="{{scrollTop}}" bindscroll="onCalendarScroll">
+    <view class="calendar-content">
+    <!-- 自适应日历卡片，不再拉伸低分辨率纸张切片 -->
     <view class="calendar-card">
-    <image class="calendar-paper-bg" src="/assets/images/ui/ui-calendar-paper.png" mode="scaleToFill" />
       <!-- 月份切换 -->
       <view class="month-selector">
         <view class="month-arrow" bindtap="onPrevMonth">‹</view>
@@ -63,7 +63,7 @@
             </view>
             <text class="lunar-text">{{item.lunar}}</text>
             <view wx:if="{{item.hasDiary}}" class="diary-mark">
-              <text class="diary-dot">🐾</text>
+              <text class="diary-dot">•</text>
             </view>
           </view>
         </block>
@@ -73,7 +73,7 @@
     <!-- 当天回忆展示区 -->
     <view class="memories-section">
       <view class="section-title-box">
-        <text class="section-title">🐾 {{month}}月{{selectedDate}}日的回忆</text>
+        <text class="section-title">{{month}}月{{selectedDate}}日的回忆</text>
       </view>
 
       <!-- 回忆微卡片列表 -->
@@ -85,11 +85,13 @@
             </view>
             <view class="card-info">
               <text class="card-title">{{item.title}}</text>
+              <text class="card-summary">{{item.summary || '打开看看这一天的记录'}}</text>
               <view class="card-meta">
                 <view class="mood-pill {{item.mood === '沮丧' ? 'mood-blue' : 'mood-warm'}}">
                   <text>{{item.mood}}</text>
                 </view>
                 <text class="card-time">{{item.time}}</text>
+                <text class="card-time" wx:if="{{item.imageCount}}">{{item.imageCount}} 张图</text>
               </view>
             </view>
           </view>
@@ -97,9 +99,10 @@
       </view>
       <!-- 空态 / 失败重试 -->
       <view class="memory-empty" wx:elif="{{dayMemories.length === 0}}">
-        <text class="memory-empty-text" wx:if="{{failed}}">回忆加载失败，请重试 🐾</text>
-        <text class="memory-empty-text" wx:else>这一天还没有回忆，去说说今天的故事吧 🐾</text>
+        <text class="memory-empty-text" wx:if="{{failed}}">Vonnie 好像刚刚没听清，再试一次？</text>
+        <text class="memory-empty-text" wx:else>这一天还没有回忆，说说今天的故事吧。</text>
         <view class="memory-retry" wx:if="{{failed}}" bindtap="onRetryMemories">重新加载</view>
+        <view class="memory-retry" wx:else bindtap="onWriteSelectedDay">写一篇日记</view>
       </view>
 
       <!-- 年份/月份快速过滤胶囊 -->
@@ -113,6 +116,7 @@
           <text class="down-arrow">▾</text>
         </view>
       </view>
+    </view>
     </view>
   </scroll-view>
 </view>

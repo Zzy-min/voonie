@@ -147,6 +147,18 @@
       {
         "type": "glob",
         "value": "assets/images/**/*.webp"
+      },
+      {
+        "type": "glob",
+        "value": "assets/images/characters/*.png"
+      },
+      {
+        "type": "glob",
+        "value": "wechat-*.png"
+      },
+      {
+        "type": "glob",
+        "value": "wechat-*.json"
       }
     ],
     "include": []

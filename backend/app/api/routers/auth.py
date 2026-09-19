@@ -10,7 +10,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from voonie.backend.app.api.deps import get_current_user
+from voonie.backend.app.api.deps import get_authenticated_user, get_current_user
 from voonie.backend.app.core.exceptions import ApiError
 from voonie.backend.app.core.security import (
     TokenValidationError,
@@ -26,16 +26,94 @@ from voonie.backend.app.schemas.auth import (
     DeviceAuthRequest,
     EmailLoginRequest,
     EmailRegisterRequest,
+    IdentityStatusResponse,
     RefreshRequest,
     TokenResponse,
     UserResponse,
     WeChatLoginRequest,
+    WeChatPhoneLoginRequest,
 )
 
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def identity_status(user: User) -> IdentityStatusResponse:
+    email_masked = None
+    if user.email:
+        local, domain = user.email.split("@", 1)
+        visible = local[:2] if len(local) > 2 else local[:1]
+        email_masked = f"{visible}{'*' * max(2, len(local) - len(visible))}@{domain}"
+    phone_masked = None
+    if user.phone:
+        phone_masked = f"{user.phone[:3]}****{user.phone[-4:]}" if len(user.phone) >= 7 else "已绑定"
+    return IdentityStatusResponse(
+        email_bound=bool(user.email),
+        email_masked=email_masked,
+        wechat_bound=bool(user.wechat_openid),
+        phone_bound=bool(user.phone),
+        phone_masked=phone_masked,
+    )
+
+
+def require_wechat_configuration(settings, code: str, message: str) -> None:
+    if not settings.WECHAT_APP_ID or not settings.WECHAT_APP_SECRET:
+        raise ApiError(status.HTTP_503_SERVICE_UNAVAILABLE, code, message)
+
+
+async def exchange_wechat_openid(settings, code: str) -> str:
+    try:
+        async with httpx.AsyncClient(timeout=settings.WECHAT_LOGIN_TIMEOUT_SECONDS) as client:
+            exchange = await client.get(
+                "https://api.weixin.qq.com/sns/jscode2session",
+                params={
+                    "appid": settings.WECHAT_APP_ID,
+                    "secret": settings.WECHAT_APP_SECRET,
+                    "js_code": code,
+                    "grant_type": "authorization_code",
+                },
+            )
+            exchange.raise_for_status()
+            payload = exchange.json()
+    except (httpx.HTTPError, ValueError) as exc:
+        raise ApiError(status.HTTP_502_BAD_GATEWAY, "wechat_service_unavailable", "微信服务暂时不可用，请稍后重试") from exc
+    openid = payload.get("openid") if isinstance(payload, dict) else None
+    if not openid:
+        raise ApiError(status.HTTP_401_UNAUTHORIZED, "invalid_wechat_code", "微信登录凭证无效或已过期，请重试")
+    return openid
+
+
+async def exchange_wechat_phone(settings, code: str) -> str:
+    try:
+        async with httpx.AsyncClient(timeout=settings.WECHAT_LOGIN_TIMEOUT_SECONDS) as client:
+            token_response = await client.get(
+                "https://api.weixin.qq.com/cgi-bin/token",
+                params={"grant_type": "client_credential", "appid": settings.WECHAT_APP_ID, "secret": settings.WECHAT_APP_SECRET},
+            )
+            token_response.raise_for_status()
+            token_payload = token_response.json()
+            access_token = token_payload.get("access_token") if isinstance(token_payload, dict) else None
+            if not access_token:
+                raise ValueError("missing WeChat access token")
+            phone_response = await client.post(
+                "https://api.weixin.qq.com/wxa/business/getuserphonenumber",
+                params={"access_token": access_token},
+                json={"code": code},
+            )
+            phone_response.raise_for_status()
+            phone_payload = phone_response.json()
+    except (httpx.HTTPError, ValueError) as exc:
+        raise ApiError(status.HTTP_502_BAD_GATEWAY, "wechat_phone_service_unavailable", "手机号服务暂时不可用，请稍后重试") from exc
+    phone_info = phone_payload.get("phone_info") if isinstance(phone_payload, dict) else None
+    phone = phone_info.get("purePhoneNumber") if isinstance(phone_info, dict) else None
+    if not phone:
+        raise ApiError(status.HTTP_401_UNAUTHORIZED, "invalid_wechat_phone_code", "手机号授权凭证无效或已过期，请重新授权")
+    normalized_phone = re.sub(r"\D", "", phone)
+    if not 6 <= len(normalized_phone) <= 20:
+        raise ApiError(status.HTTP_422_UNPROCESSABLE_ENTITY, "invalid_phone_number", "微信返回的手机号格式无效")
+    return normalized_phone
 
 
 async def optional_authenticated_user(request: Request, db: AsyncSession) -> User | None:
@@ -90,6 +168,7 @@ async def issue_token_pair(user: User, request: Request, response: Response, db:
         expires_in=settings.ACCESS_TOKEN_MINUTES * 60,
         user_id=user.id,
         email=user.email,
+        phone=user.phone,
         nickname=user.nickname,
     )
 
@@ -168,40 +247,12 @@ async def login_by_wechat(
     db: AsyncSession = Depends(get_db),
 ) -> TokenResponse:
     settings = request.app.state.settings
-    if not settings.WECHAT_APP_ID or not settings.WECHAT_APP_SECRET:
-        raise ApiError(
-            status.HTTP_503_SERVICE_UNAVAILABLE,
-            "wechat_login_not_configured",
-            "微信快捷登录暂未开放，请继续匿名使用或使用邮箱登录",
-        )
-
-    try:
-        async with httpx.AsyncClient(timeout=settings.WECHAT_LOGIN_TIMEOUT_SECONDS) as client:
-            exchange = await client.get(
-                "https://api.weixin.qq.com/sns/jscode2session",
-                params={
-                    "appid": settings.WECHAT_APP_ID,
-                    "secret": settings.WECHAT_APP_SECRET,
-                    "js_code": body.code,
-                    "grant_type": "authorization_code",
-                },
-            )
-            exchange.raise_for_status()
-            payload = exchange.json()
-    except (httpx.HTTPError, ValueError) as exc:
-        raise ApiError(
-            status.HTTP_502_BAD_GATEWAY,
-            "wechat_service_unavailable",
-            "微信登录服务暂时不可用，请稍后重试",
-        ) from exc
-
-    openid = payload.get("openid") if isinstance(payload, dict) else None
-    if not openid:
-        raise ApiError(
-            status.HTTP_401_UNAUTHORIZED,
-            "invalid_wechat_code",
-            "微信登录凭证无效或已过期，请重试",
-        )
+    require_wechat_configuration(
+        settings,
+        "wechat_login_not_configured",
+        "微信快捷登录暂未开放，请继续匿名使用或使用邮箱登录",
+    )
+    openid = await exchange_wechat_openid(settings, body.code)
 
     user = await db.scalar(select(User).where(User.wechat_openid == openid))
     if user is None:
@@ -223,6 +274,80 @@ async def login_by_wechat(
     tokens = await issue_token_pair(user, request, response, db)
     await db.commit()
     return tokens
+
+
+@router.post("/wechat-phone", response_model=TokenResponse)
+async def login_by_wechat_phone(
+    body: WeChatPhoneLoginRequest,
+    request: Request,
+    response: Response,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> TokenResponse:
+    """Use the one-time code from the mini-program getPhoneNumber button."""
+    settings = request.app.state.settings
+    require_wechat_configuration(
+        settings,
+        "wechat_phone_login_not_configured",
+        "手机号快捷登录暂未开放，请使用微信或邮箱登录",
+    )
+    normalized_phone = await exchange_wechat_phone(settings, body.code)
+
+    owner = await db.scalar(select(User).where(User.phone == normalized_phone))
+    if owner is not None and owner.id != current_user.id:
+        raise ApiError(status.HTTP_409_CONFLICT, "phone_owned_by_another_account", "这个手机号已绑定其他账号，请先使用原账号登录")
+    if current_user.phone and current_user.phone != normalized_phone:
+        raise ApiError(status.HTTP_409_CONFLICT, "phone_already_bound", "当前账号已绑定其他手机号")
+    current_user.phone = normalized_phone
+
+    tokens = await issue_token_pair(current_user, request, response, db)
+    await db.commit()
+    return tokens
+
+
+@router.get("/identities", response_model=IdentityStatusResponse)
+async def get_identity_status(current_user: User = Depends(get_authenticated_user)) -> IdentityStatusResponse:
+    return identity_status(current_user)
+
+
+@router.post("/bind-wechat", response_model=IdentityStatusResponse)
+async def bind_wechat_identity(
+    body: WeChatLoginRequest,
+    request: Request,
+    current_user: User = Depends(get_authenticated_user),
+    db: AsyncSession = Depends(get_db),
+) -> IdentityStatusResponse:
+    settings = request.app.state.settings
+    require_wechat_configuration(settings, "wechat_login_not_configured", "微信绑定暂未开放")
+    openid = await exchange_wechat_openid(settings, body.code)
+    owner = await db.scalar(select(User).where(User.wechat_openid == openid))
+    if owner is not None and owner.id != current_user.id:
+        raise ApiError(status.HTTP_409_CONFLICT, "wechat_owned_by_another_account", "这个微信已绑定其他账号，请先使用原账号登录")
+    if current_user.wechat_openid and current_user.wechat_openid != openid:
+        raise ApiError(status.HTTP_409_CONFLICT, "wechat_already_bound", "当前账号已绑定其他微信")
+    current_user.wechat_openid = openid
+    await db.commit()
+    return identity_status(current_user)
+
+
+@router.post("/bind-phone", response_model=IdentityStatusResponse)
+async def bind_phone_identity(
+    body: WeChatPhoneLoginRequest,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> IdentityStatusResponse:
+    settings = request.app.state.settings
+    require_wechat_configuration(settings, "wechat_phone_login_not_configured", "手机号绑定暂未开放")
+    phone = await exchange_wechat_phone(settings, body.code)
+    owner = await db.scalar(select(User).where(User.phone == phone))
+    if owner is not None and owner.id != current_user.id:
+        raise ApiError(status.HTTP_409_CONFLICT, "phone_owned_by_another_account", "这个手机号已绑定其他账号，请先使用原账号登录")
+    if current_user.phone and current_user.phone != phone:
+        raise ApiError(status.HTTP_409_CONFLICT, "phone_already_bound", "当前账号已绑定其他手机号")
+    current_user.phone = phone
+    await db.commit()
+    return identity_status(current_user)
 
 
 @router.post("/logout")
@@ -253,14 +378,16 @@ async def logout(
 
 
 @router.get("/me", response_model=UserResponse)
-async def get_me(current_user: User = Depends(get_current_user)) -> UserResponse:
+async def get_me(current_user: User = Depends(get_authenticated_user)) -> UserResponse:
     return UserResponse(
         id=current_user.id,
         email=current_user.email,
+        phone=current_user.phone,
         nickname=current_user.nickname,
         quote=current_user.quote,
         quote_note=current_user.quote_note,
         memory_opt_in=current_user.memory_opt_in,
+        wechat_bound=bool(current_user.wechat_openid),
         created_at=current_user.created_at.isoformat() if current_user.created_at else None,
     )
 

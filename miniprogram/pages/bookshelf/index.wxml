@@ -17,6 +17,12 @@
   </view>
 
   <scroll-view class="bookshelf-scroll" scroll-y bindscrolltolower="onLoadMore" lower-threshold="120">
+    <view class="bookshelf-content">
+    <view wx:if="{{loading}}" class="shelf-loading">
+      <view class="voonie-spinner"></view>
+      <text>正在整理你的日记与绘本…</text>
+    </view>
+    <block wx:else>
     <!-- 回忆日历：书架的核心内容集合入口 -->
     <view class="shelf-calendar-card" bindtap="onOpenCalendar">
       <view class="cal-icon-box">
@@ -60,7 +66,7 @@
       </view>
       <text class="empty-title">{{failed ? '书架正在静候' : '书架还空空的'}}</text>
       <text class="empty-sub" wx:if="{{failed}}">网络出了点小状况，绘本依然完好珍藏在架上 🐾</text>
-      <text class="empty-sub" wx:else>把今天的日常说给 Voonie，就会被温柔画进绘本架里 🐾</text>
+      <text class="empty-sub" wx:else>把今天的日常说给 Vonnie，它会帮你整理成日记和绘本。</text>
       <view class="empty-retry" wx:if="{{failed}}" bindtap="onRetry">重新整理书架</view>
     </view>
 
@@ -85,5 +91,7 @@
       <view class="shelf-board"></view>
     </block>
 
+    </block>
+    </view>
   </scroll-view>
 </view>

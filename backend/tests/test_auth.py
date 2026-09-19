@@ -18,10 +18,12 @@ def auth_client():
     data_dir.mkdir(exist_ok=True)
     database_path = data_dir / f"auth-{uuid.uuid4().hex}.db"
     settings = Settings(
+        _env_file=None,
         DATABASE_URL=f"sqlite+aiosqlite:///{database_path.as_posix()}",
         JWT_SECRET="test-secret-that-is-long-enough-for-hs256",
         ARQ_INLINE=True,
         TESTING=False,
+        REQUIRE_WECHAT_BINDING=True,
     )
     app = create_app(settings)
 
@@ -67,7 +69,7 @@ def test_invalid_access_token_is_rejected(auth_client):
     assert response.json()["error"]["code"] == "invalid_token"
 
 
-def test_device_registration_is_idempotent_and_access_token_authenticates(auth_client):
+def test_device_registration_requires_wechat_before_product_data(auth_client):
     first = register_device(auth_client)
     second = register_device(auth_client)
 
@@ -77,7 +79,14 @@ def test_device_registration_is_idempotent_and_access_token_authenticates(auth_c
         "/api/v1/diaries",
         headers={"Authorization": f"Bearer {first['access_token']}"},
     )
-    assert response.status_code == 200
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "wechat_binding_required"
+    identity = auth_client.get(
+        "/api/v1/auth/identities",
+        headers={"Authorization": f"Bearer {first['access_token']}"},
+    )
+    assert identity.status_code == 200
+    assert identity.json()["wechat_bound"] is False
 
 
 def test_existing_device_requires_installation_proof(auth_client):
@@ -131,7 +140,9 @@ def test_web_session_uses_http_only_cookies(auth_client):
     cookies = response.headers.get_list("set-cookie")
     assert any("voonie_access=" in cookie and "HttpOnly" in cookie for cookie in cookies)
     assert any("voonie_refresh=" in cookie and "HttpOnly" in cookie for cookie in cookies)
-    assert auth_client.get("/api/v1/diaries").status_code == 200
+    blocked = auth_client.get("/api/v1/diaries")
+    assert blocked.status_code == 403
+    assert blocked.json()["error"]["code"] == "wechat_binding_required"
     refreshed = auth_client.post("/api/v1/auth/refresh", json={})
     assert refreshed.status_code == 200
 
@@ -335,3 +346,194 @@ def test_wechat_login_rejects_invalid_exchange_response(auth_client, monkeypatch
 
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "invalid_wechat_code"
+
+
+def test_wechat_phone_login_binds_verified_anonymous_user(auth_client, monkeypatch):
+    registered = register_device(auth_client, "phone-bind-device-001")
+    auth_client.app.state.settings.WECHAT_APP_ID = "test-app-id"
+    auth_client.app.state.settings.WECHAT_APP_SECRET = "test-app-secret"
+
+    async def bind_wechat_first():
+        async with auth_client.app.state.db_session_factory() as session:
+            user = await session.get(User, registered["user_id"])
+            user.wechat_openid = "phone-flow-wechat-openid"
+            await session.commit()
+
+    asyncio.run(bind_wechat_first())
+
+    class FakeTokenResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"access_token": "wechat-server-access-token", "expires_in": 7200}
+
+    class FakePhoneResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "errcode": 0,
+                "phone_info": {
+                    "phoneNumber": "+86 13800138000",
+                    "purePhoneNumber": "13800138000",
+                    "countryCode": "86",
+                },
+            }
+
+    async def fake_get(self, url, *, params):
+        assert url == "https://api.weixin.qq.com/cgi-bin/token"
+        assert params["appid"] == "test-app-id"
+        return FakeTokenResponse()
+
+    async def fake_post(self, url, *, params, json):
+        assert url == "https://api.weixin.qq.com/wxa/business/getuserphonenumber"
+        assert params["access_token"] == "wechat-server-access-token"
+        assert json == {"code": "phone-code"}
+        return FakePhoneResponse()
+
+    monkeypatch.setattr("httpx.AsyncClient.get", fake_get)
+    monkeypatch.setattr("httpx.AsyncClient.post", fake_post)
+    response = auth_client.post(
+        "/api/v1/auth/wechat-phone",
+        headers={"Authorization": f"Bearer {registered['access_token']}"},
+        json={"code": "phone-code"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["user_id"] == registered["user_id"]
+    assert response.json()["phone"] == "13800138000"
+    assert "wechat-server-access-token" not in response.text
+
+    async def stored_phone():
+        async with auth_client.app.state.db_session_factory() as session:
+            user = await session.get(User, registered["user_id"])
+            return user.phone
+
+    assert asyncio.run(stored_phone()) == "13800138000"
+
+
+def test_wechat_phone_login_rejects_invalid_code(auth_client, monkeypatch):
+    registered = register_device(auth_client, "phone-invalid-code-001")
+    auth_client.app.state.settings.WECHAT_APP_ID = "test-app-id"
+    auth_client.app.state.settings.WECHAT_APP_SECRET = "test-app-secret"
+
+    async def bind_wechat_first():
+        async with auth_client.app.state.db_session_factory() as session:
+            user = await session.get(User, registered["user_id"])
+            user.wechat_openid = "phone-invalid-wechat-openid"
+            await session.commit()
+
+    asyncio.run(bind_wechat_first())
+
+    class FakeResponse:
+        def __init__(self, payload):
+            self.payload = payload
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return self.payload
+
+    async def fake_get(self, url, *, params):
+        return FakeResponse({"access_token": "wechat-server-access-token"})
+
+    async def fake_post(self, url, *, params, json):
+        return FakeResponse({"errcode": 40029, "errmsg": "invalid code"})
+
+    monkeypatch.setattr("httpx.AsyncClient.get", fake_get)
+    monkeypatch.setattr("httpx.AsyncClient.post", fake_post)
+    response = auth_client.post(
+        "/api/v1/auth/wechat-phone",
+        headers={"Authorization": f"Bearer {registered['access_token']}"},
+        json={"code": "expired-code"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "invalid_wechat_phone_code"
+
+
+def test_identity_status_and_bind_wechat_keep_current_account(auth_client, monkeypatch):
+    registration = auth_client.post("/api/v1/auth/register", json={
+        "email": "owner@example.com",
+        "password": "correct-password",
+        "confirm_password": "correct-password",
+        "nickname": "原账号",
+    }).json()
+    auth_client.app.state.settings.WECHAT_APP_ID = "test-app-id"
+    auth_client.app.state.settings.WECHAT_APP_SECRET = "test-app-secret"
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"openid": "bind-openid-001"}
+
+    async def fake_get(self, url, *, params):
+        return FakeResponse()
+
+    monkeypatch.setattr("httpx.AsyncClient.get", fake_get)
+    headers = {"Authorization": f"Bearer {registration['access_token']}"}
+    before = auth_client.get("/api/v1/auth/identities", headers=headers)
+    bound = auth_client.post("/api/v1/auth/bind-wechat", headers=headers, json={"code": "bind-code"})
+
+    assert before.status_code == 200
+    assert before.json()["email_masked"] == "ow***@example.com"
+    assert before.json()["wechat_bound"] is False
+    assert bound.status_code == 200
+    assert bound.json()["wechat_bound"] is True
+
+    async def stored_identity():
+        async with auth_client.app.state.db_session_factory() as session:
+            user = await session.get(User, registration["user_id"])
+            return user.wechat_openid
+
+    assert asyncio.run(stored_identity()) == "bind-openid-001"
+
+
+def test_bind_wechat_rejects_identity_owned_by_another_account(auth_client, monkeypatch):
+    first = register_device(auth_client, "bind-owner-001")
+    second = register_device(auth_client, "bind-owner-002")
+    auth_client.app.state.settings.WECHAT_APP_ID = "test-app-id"
+    auth_client.app.state.settings.WECHAT_APP_SECRET = "test-app-secret"
+
+    async def assign_owner():
+        async with auth_client.app.state.db_session_factory() as session:
+            owner = await session.get(User, first["user_id"])
+            owner.wechat_openid = "already-owned-openid"
+            await session.commit()
+
+    asyncio.run(assign_owner())
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"openid": "already-owned-openid"}
+
+    async def fake_get(self, url, *, params):
+        return FakeResponse()
+
+    monkeypatch.setattr("httpx.AsyncClient.get", fake_get)
+    response = auth_client.post(
+        "/api/v1/auth/bind-wechat",
+        headers={"Authorization": f"Bearer {second['access_token']}"},
+        json={"code": "bind-code"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "wechat_owned_by_another_account"
+def test_legacy_wechat_environment_names_remain_supported(monkeypatch):
+    monkeypatch.delenv("WECHAT_APP_ID", raising=False)
+    monkeypatch.delenv("WECHAT_APP_SECRET", raising=False)
+    monkeypatch.setenv("WECHAT_MINI_APPID", "legacy-mini-app-id")
+    monkeypatch.setenv("WECHAT_MINI_SECRET", "legacy-mini-secret")
+
+    settings = Settings(_env_file=None)
+
+    assert settings.WECHAT_APP_ID == "legacy-mini-app-id"
+    assert settings.WECHAT_APP_SECRET == "legacy-mini-secret"

@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from typing import Annotated, Any
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import AliasChoices, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -44,9 +44,18 @@ class Settings(BaseSettings):
     TESTING: bool = False
     PRODUCTION: bool = False
     COOKIE_SECURE: bool = False
-    WECHAT_APP_ID: str = ""
-    WECHAT_APP_SECRET: str = ""
+    # Accept both the canonical production names and the legacy MINI names
+    # already used by earlier deployments. Canonical names take precedence.
+    WECHAT_APP_ID: str = Field(
+        default="",
+        validation_alias=AliasChoices("WECHAT_APP_ID", "WECHAT_MINI_APPID"),
+    )
+    WECHAT_APP_SECRET: str = Field(
+        default="",
+        validation_alias=AliasChoices("WECHAT_APP_SECRET", "WECHAT_MINI_SECRET"),
+    )
     WECHAT_LOGIN_TIMEOUT_SECONDS: float = 8.0
+    REQUIRE_WECHAT_BINDING: bool = True
 
     BASE_DIR: Path = BACKEND_DIR
     TEMP_MEDIA_DIR: Path = BASE_DIR / "temp_media"

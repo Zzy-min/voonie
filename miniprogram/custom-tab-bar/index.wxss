@@ -1,133 +1,53 @@
-/* custom-tab-bar/index.wxss */
 .tab-bar-container {
   position: fixed;
-  bottom: 0;
   left: 0;
   right: 0;
+  bottom: 0;
   z-index: 999;
-  background-color: #FAF7F0;
-  border-top: 1rpx solid #E8DFD3;
   padding-bottom: env(safe-area-inset-bottom);
+  background: rgba(255, 253, 248, 0.98);
+  border-top: 1rpx solid #EEE3D5;
 }
 
 .tab-bar {
-  height: 110rpx;
+  height: 112rpx;
   display: flex;
-  align-items: center;
-  justify-content: space-around;
-  position: relative;
+  align-items: stretch;
 }
 
 .tab-item {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100%;
-  min-width: 96rpx;
-  padding: 6rpx 0;
-  color: #7A6F64;
-  transition: all 0.2s ease;
+  gap: 6rpx;
+  color: #A89789;
+  transition: color 120ms ease, transform 120ms ease;
 }
 
-.tab-item.active {
-  color: #D9845B;
-  font-weight: 600;
-  transform: translateY(-2rpx);
-}
+.tab-item:active { transform: scale(0.98); }
+.tab-item.active { color: #C7842F; }
 
 .tab-icon {
-  width: 44rpx;
-  height: 44rpx;
+  width: 42rpx;
+  height: 42rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 6rpx;
 }
 
 .tab-icon-img {
-  width: 44rpx;
-  height: 44rpx;
-  display: block;
-}
-
-.paw-icon-img {
-  width: 52rpx;
-  height: 52rpx;
+  width: 40rpx;
+  height: 40rpx;
   display: block;
 }
 
 .tab-label {
   font-size: 20rpx;
+  line-height: 1.2;
   font-weight: 500;
 }
 
-/* 中间凸起的大圆形萌宠按键（对齐案例：深咖色常态 + 仅激活态橙晕） */
-.tab-record-item {
-  position: relative;
-  top: -24rpx;
-}
-
-.record-btn-glow {
-  position: absolute;
-  top: -8rpx;
-  width: 104rpx;
-  height: 104rpx;
-  border-radius: 50%;
-  background-color: rgba(217, 132, 91, 0.22);
-  animation: pulseGlow 2.4s infinite;
-}
-
-.record-btn {
-  width: 96rpx;
-  height: 96rpx;
-  border-radius: 50%;
-  background: #432E1E !important; /* 案例真源深咖色：未选中萌宠时必须是深咖 #432E1E，严禁橙色渐变/橙晕 */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 6rpx 18rpx rgba(67, 46, 30, 0.3);
-  border: 4rpx solid #FAF7F0;
-  position: relative;
-  z-index: 2;
-  transition: all 0.2s ease;
-}
-
-.tab-record-item.active .record-btn {
-  background: linear-gradient(135deg, #D9845B 0%, #C26741 100%) !important;
-  box-shadow: 0 8rpx 26rpx rgba(217, 132, 91, 0.45);
-  transform: scale(1.04);
-}
-
-.tab-record-item:active .record-btn {
-  transform: scale(0.92);
-}
-
-.paw-icon {
-  font-size: 44rpx;
-}
-
-.record-label {
-  margin-top: 4rpx;
-  font-size: 20rpx;
-  color: #7A6F64;
-  font-weight: 500;
-  transition: color 0.2s ease;
-}
-
-.tab-record-item.active .record-label {
-  color: #D9845B;
-  font-weight: 700;
-}
-
-@keyframes pulseGlow {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 0.4;
-  }
-  50% {
-    transform: scale(1.16);
-    opacity: 0.85;
-  }
-}
+.tab-item.active .tab-label { font-weight: 600; }

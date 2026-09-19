@@ -3,17 +3,23 @@
   <!-- 真实轻纸质温润场景背景切片（对齐案例第5屏） -->
   <image class="generation-bg" src="/assets/images/ui/ui-bg-ai-organize.png" mode="aspectFill" />
 
-  <!-- 顶部状态栏占位 -->
   <view style="height: {{statusBarHeight}}px;"></view>
 
-  <view class="generation-header" style="padding-right: {{navRightPadding}}px;">
-    <view class="header-texts">
-      <text class="main-title">正在整理今天...</text>
-      <text class="sub-title">马上就好，我会帮你轻轻收好。</text>
+  <view class="generation-nav" style="height: {{navBarHeight}}px; padding-right: {{navRightPadding}}px;">
+    <view class="cancel-btn" bindtap="onSkip">
+      <text class="cancel-icon">×</text>
+      <text class="cancel-text">取消</text>
     </view>
-    <view class="skip-btn" bindtap="onSkip">
-      <text class="skip-text">✕ 取消</text>
-    </view>
+  </view>
+
+  <view class="generation-header">
+    <text class="main-title">Vonnie 正在整理你的今天…</text>
+    <text class="sub-title">整理完成后，会生成日记和绘本。</text>
+  </view>
+
+  <view class="draft-preview" wx:if="{{draftText}}">
+    <view class="draft-preview-head"><text>你的原始记录</text><text class="edit-draft" bindtap="onEditDraft">{{canceling ? '正在返回…' : '继续修改'}}</text></view>
+    <text class="draft-preview-text">{{draftText}}</text>
   </view>
 
   <!-- 步骤清单卡片 -->
@@ -22,7 +28,7 @@
       <view class="step-icon-wrap">
         <text class="check-mark">{{step >= 1 ? '✓' : '○'}}</text>
       </view>
-      <text class="step-name">添加的文字</text>
+      <text class="step-name">语音转文字</text>
       <text class="step-status">{{step >= 1 ? '已完成' : '排队中...'}}</text>
     </view>
 
@@ -30,7 +36,7 @@
       <view class="step-icon-wrap">
         <text class="check-mark">{{step >= 2 ? '✓' : '○'}}</text>
       </view>
-      <text class="step-name">整理今天发生的事</text>
+      <text class="step-name">理解今天发生的事情</text>
       <text class="step-status">{{step >= 2 ? '已完成' : '排队中...'}}</text>
     </view>
 
@@ -38,23 +44,23 @@
       <view class="step-icon-wrap">
         <text class="check-mark">{{step >= 3 ? '✓' : '○'}}</text>
       </view>
-      <text class="step-name">分析情绪</text>
+      <text class="step-name">整理重要片段</text>
       <text class="step-status">{{step >= 3 ? '已完成' : (step === 2 ? '进行中…' : '排队中...')}}</text>
     </view>
 
     <view class="step-item {{step >= 4 ? 'completed' : (step === 3 ? 'in-progress' : 'pending')}}">
       <view class="step-icon-wrap">
-        <text class="check-mark">{{step >= 4 ? '✓' : (step === 3 ? '⚡' : '○')}}</text>
+        <text class="check-mark">{{step >= 4 ? '✓' : (step === 3 ? '•' : '○')}}</text>
       </view>
-      <text class="step-name">生成日记文字</text>
+      <text class="step-name">生成日记</text>
       <text class="step-status {{step === 3 ? 'highlight' : ''}}">{{step >= 4 ? '已完成' : (step === 3 ? '进行中…' : '排队中...')}}</text>
     </view>
 
     <view class="step-item {{step >= 5 ? 'completed' : (step === 4 ? 'in-progress' : 'pending')}}">
       <view class="step-icon-wrap">
-        <text class="check-mark">{{step >= 5 ? '✓' : (step === 4 ? '🎨' : '○')}}</text>
+        <text class="check-mark">{{step >= 5 ? '✓' : (step === 4 ? '•' : '○')}}</text>
       </view>
-      <text class="step-name">绘制回忆插画</text>
+      <text class="step-name">准备绘本</text>
       <text class="step-status {{step === 4 ? 'highlight' : ''}}">{{step >= 5 ? '已完成' : (step === 4 ? '绘制中…' : '排队中...')}}</text>
     </view>
 
@@ -77,8 +83,8 @@
     </view>
   </view>
 
-  <!-- 伏案写字的真实木质桌面场景（对齐案例第5屏：原木桌面、写字小狗、手帐与咖啡杯） -->
-  <view class="desk-dog-area">
-      <image class="desk-scene-img anim-breathe" src="/assets/images/ui/ui-ai-desk.png" mode="widthFix" />
+  <view class="desk-dog-area {{draftText ? 'compact' : ''}}">
+    <image class="desk-scene-img" src="/assets/images/voonie/vonnie-writing-desk-hd.jpg" mode="aspectFill" />
+    <text class="desk-caption">慢慢来，Vonnie 正在认真整理。</text>
   </view>
 </view>

@@ -1,115 +1,37 @@
-<!-- pages/pet/index.wxml - 萌宠独立页（对齐案例第3屏：快捷聊天与探头小狗） -->
-<view class="voonie-page pet-page">
-  <!-- 柔和居室/纸质背景切片 -->
-  <image class="pet-bg" src="/assets/images/ui/ui-bg-chat.png" mode="aspectFill" />
-
-  <!-- 顶部状态栏与日期导航 -->
-  <view class="pet-header" style="padding-top: {{statusBarHeight}}px;">
+<view class="voonie-page chat-page">
+  <view class="chat-header" style="padding-top: {{statusBarHeight}}px;">
     <view class="header-nav" style="height: {{navBarHeight}}px; padding-right: {{navRightPadding}}px;">
-      <view class="header-date-box">
-        <text class="pet-date-text">{{dateLabel}}</text>
-      </view>
-      <view class="bookshelf-link" bindtap="onOpenBookshelf">
-        <image class="bookshelf-svg" src="/assets/icons/icon-bookshelf.svg" mode="aspectFit" />
-      </view>
+      <image class="header-avatar" src="/assets/images/voonie/voonie-avatar.png" mode="aspectFill" />
+      <view class="header-copy"><text class="header-title">和 Vonnie 聊天</text><text class="header-sub">陪你听一会儿{{petStatusLabel ? ' · ' + petStatusLabel : ''}}</text></view>
     </view>
   </view>
 
-  <!-- 探头小狗舞台（小爪贴合下方聊天卡上沿） -->
-  <view class="pet-peeker-stage">
-    <image class="pet-peeker-img voonie-mascot voonie-mascot--hero anim-breathe" src="/assets/images/voonie/voonie-peek.png" mode="aspectFit" />
-  </view>
-
-  <!-- 案例半屏浮动圆角聊天卡 -->
-  <view class="pet-chat-card">
-    <view class="chat-card-header">
-      <view class="card-title-box">
-        <text class="card-title-main">Voonie</text>
-        <view class="card-title-sub-row">
-          <text class="card-lock-icon">🔒</text>
-          <text class="card-sub-text">私人聊天</text>
-          <text wx:if="{{petStatusLabel}}" class="card-status-pill">· {{petStatusLabel}}</text>
-        </view>
-      </view>
+  <scroll-view class="messages" scroll-y scroll-top="{{scrollTop}}" scroll-with-animation>
+    <view class="day-label">{{dateLabel}}</view>
+    <view class="message vonnie-message">
+      <image class="message-avatar" src="/assets/images/voonie/voonie-avatar.png" mode="aspectFill" />
+      <view class="bubble vonnie-bubble"><text>{{greeting}}</text></view>
     </view>
 
-    <!-- 对话消息列表 -->
-    <scroll-view class="chat-messages" scroll-y scroll-top="{{scrollTop}}" scroll-with-animation>
-      <view class="msg-item pet-msg">
-        <image class="msg-avatar" src="/assets/images/voonie/voonie-avatar.png" mode="aspectFit" />
-        <view class="msg-bubble pet-bubble">
-          <text>{{greeting}}</text>
-        </view>
-      </view>
+    <block wx:for="{{messages}}" wx:key="id">
+      <view class="message user-message" wx:if="{{item.role === 'user'}}"><view class="bubble user-bubble"><text>{{item.content}}</text></view></view>
+      <view class="message vonnie-message" wx:else><image class="message-avatar" src="/assets/images/voonie/voonie-avatar.png" mode="aspectFill" /><view class="bubble vonnie-bubble"><text>{{item.content}}</text></view></view>
+    </block>
+    <view wx:if="{{loading}}" class="message vonnie-message"><image class="message-avatar" src="/assets/images/voonie/voonie-avatar.png" mode="aspectFill" /><view class="bubble vonnie-bubble thinking"><text>Vonnie 正在想你说的话…</text></view></view>
+  </scroll-view>
 
-      <!-- 记得的小事（轻量展示） -->
-      <view wx:if="{{memStories.length}}" class="memories-card">
-        <view class="memories-head">
-          <text class="memories-title">🎀 我记得的小事</text>
-        </view>
-        <view class="memories-item" wx:for="{{memStories}}" wx:key="index">
-          <text class="memories-bullet">✦</text>
-          <text class="memories-text">{{item}}</text>
-        </view>
-      </view>
-
-      <block wx:for="{{messages}}" wx:key="id">
-        <view wx:if="{{item.role === 'user'}}" class="msg-item user-msg">
-          <view class="msg-bubble user-bubble">
-            <text>{{item.content}}</text>
-          </view>
-        </view>
-        <view wx:else class="msg-item pet-msg">
-          <image class="msg-avatar" src="/assets/images/voonie/voonie-avatar.png" mode="aspectFit" />
-          <view class="msg-bubble pet-bubble">
-            <text>{{item.content}}</text>
-          </view>
-        </view>
-      </block>
-
-      <view wx:if="{{loading}}" class="msg-item pet-msg">
-        <image class="msg-avatar" src="/assets/images/voonie/voonie-avatar.png" mode="aspectFit" />
-        <view class="msg-bubble pet-bubble thinking">
-          <text>{{petName}} 正在思考中… ✨</text>
-        </view>
+  <view class="composer-wrap {{keyboardHeight > 0 ? 'keyboard-open' : ''}}" style="{{composerStyle}}">
+    <scroll-view class="quick-prompts" scroll-x enhanced show-scrollbar="{{false}}">
+      <view class="quick-row">
+        <view class="quick-chip" bindtap="onSelectTag" data-text="今天有点累，陪我聊聊吧">陪我聊聊</view>
+        <view class="quick-chip" bindtap="onSelectTag" data-text="今天发生了一件开心的事">今天很开心</view>
+        <view class="quick-chip" bindtap="onChipWriteDiary">写成日记</view>
       </view>
     </scroll-view>
-
-    <!-- 快捷 chip 推荐（对齐案例第3屏：陪我聊聊 / 日记一下 / 我有点想说） -->
-    <view class="quick-tags">
-      <view class="tag-chip" bindtap="onSelectTag" data-text="今天有点累，陪我聊聊吧">
-        <text class="chip-icon">♡</text>
-        <text>陪我聊聊</text>
-      </view>
-      <view class="tag-chip" bindtap="onChipWriteDiary">
-        <text class="chip-icon">☆</text>
-        <text>日记一下</text>
-      </view>
-      <view class="tag-chip" bindtap="onChipWish">
-        <text class="chip-icon">♡</text>
-        <text>我有点想说</text>
-      </view>
-    </view>
-
-    <!-- 底部输入条 + 独立圆麦克风 + 独立圆发送按钮 -->
-    <view class="chat-input-bar">
-      <input
-        class="chat-input"
-        placeholder="说点什么..."
-        placeholder-class="chat-input-placeholder"
-        value="{{inputValue}}"
-        bindinput="onInput"
-        bindconfirm="onSend"
-        confirm-type="send"
-        adjust-position="{{true}}"
-        cursor-spacing="16"
-      />
-      <view class="voice-btn" bindtap="onChipWriteDiary">
-        <image class="voice-icon-svg" src="/assets/icons/icon-mic.svg" mode="aspectFit" />
-      </view>
-      <view class="send-btn {{inputValue ? 'active' : ''}}" bindtap="onSend">
-        <text class="send-arrow">➔</text>
-      </view>
+    <view class="composer">
+      <view class="voice-button" bindtap="onChipWriteDiary" aria-role="button" aria-label="语音记录"><image src="/assets/icons/icon-mic.svg" mode="aspectFit" /></view>
+      <input class="chat-input" placeholder="说点什么…" placeholder-class="chat-placeholder" value="{{inputValue}}" bindinput="onInput" bindconfirm="onSend" bindkeyboardheightchange="onKeyboardHeightChange" bindblur="onInputBlur" confirm-type="send" adjust-position="{{false}}" cursor-spacing="12" />
+      <view class="send-button {{inputValue && !loading ? 'active' : ''}}" bindtap="onSend" aria-role="button">发送</view>
     </view>
   </view>
 </view>

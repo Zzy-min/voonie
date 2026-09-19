@@ -8,7 +8,7 @@ Page({
     navBarHeight: 44,
     navRightPadding: 96,
     diaryId: "",
-    content: "今天遇见了一只小狗，阳光温暖的…… 每一个细碎的瞬间都值得被好好画下来。",
+    content: "",
     illustrationUrl: "/assets/images/ui/illust-play-flowers.png",
     isPublic: false, // 核心安全原则：默认私密！
     hideDate: false,
@@ -23,9 +23,7 @@ Page({
       navBarHeight: nav.navBarHeight,
       navRightPadding: nav.navRightPadding,
       diaryId: options.id || "",
-      content:
-        options.text ||
-        "今天遇见了一只小狗，阳光温暖的…… 每一个细碎的瞬间都值得被好好画下来。",
+      content: options.text || "",
     });
 
     if (options.id) {
@@ -37,7 +35,8 @@ Page({
               ? await authenticatedMediaUrl(diary.panels[0].image_url)
         : "/assets/images/ui/illust-play-flowers.png";
           this.setData({
-            content: diary.summary || diary.full_content.slice(0, 100),
+            // 发布的是用户的日记正文，不是 Vonnie 的陪伴摘要。
+            content: (diary.full_content || "").slice(0, 500),
             illustrationUrl: img,
           });
         }

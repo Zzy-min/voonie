@@ -6,9 +6,7 @@
   <!-- 顶部状态栏与 Tab 切换（对齐案例第9屏） -->
   <view class="square-header" style="padding-top: {{statusBarHeight}}px;">
     <view class="header-nav" style="height: {{navBarHeight}}px; padding-right: {{navRightPadding}}px;">
-      <view class="back-btn" bindtap="onBack">
-        <image class="back-icon-svg" src="/assets/icons/icon-back.svg" mode="aspectFit" />
-      </view>
+      <view class="header-spacer"></view>
       <text class="square-main-title">分享广场</text>
       <view class="search-btn" bindtap="onSearch">
         <image class="search-icon-svg" src="/assets/icons/icon-search.svg" mode="aspectFit" />
@@ -34,7 +32,7 @@
       <view class="square-empty-action" bindtap="onChooseDiary">从书架选择一本</view>
     </view>
     <block wx:for="{{posts}}" wx:key="id">
-      <view class="feed-card">
+      <view class="feed-card" bindtap="onOpenPost" data-share-id="{{item.id}}">
         <!-- 头部作者信息 -->
         <view class="feed-user-bar">
           <image class="feed-avatar" src="{{item.avatar}}" mode="aspectFill" />
@@ -44,7 +42,7 @@
               <text>★ {{item.mood}}</text>
             </view>
           </view>
-          <view class="feed-more-btn" bindtap="onMoreAction" data-id="{{item.id}}">
+          <view class="feed-more-btn" catchtap="onMoreAction" data-id="{{item.id}}">
             <text>•••</text>
           </view>
         </view>
@@ -53,23 +51,23 @@
         <text class="feed-caption">{{item.caption}}</text>
 
         <!-- 绘本插图 -->
-        <view class="feed-img-wrap" bindtap="onPreview" data-img="{{item.image}}">
+        <view class="feed-img-wrap">
           <image class="feed-img" src="{{item.image}}" mode="aspectFill" />
         </view>
 
         <!-- 互动操作栏 -->
         <view class="feed-action-bar">
-          <view class="action-stat {{item.isLiked ? 'liked' : ''}}" bindtap="onLike" data-id="{{item.id}}">
+          <view class="action-stat {{item.isLiked ? 'liked' : ''}}" catchtap="onLike" data-id="{{item.id}}">
             <text class="action-icon">{{item.isLiked ? '❤️' : '🤍'}}</text>
             <text class="action-count">{{item.likes}}</text>
           </view>
 
-          <view class="action-stat {{item.isCollected ? 'liked' : ''}}" bindtap="onCollect" data-id="{{item.id}}">
+          <view class="action-stat {{item.isCollected ? 'liked' : ''}}" catchtap="onCollect" data-id="{{item.id}}">
             <text class="action-icon">{{item.isCollected ? '⭐' : '☆'}}</text>
             <text class="action-count">{{item.collects}}</text>
           </view>
 
-          <view class="action-stat" bindtap="onSharePost" data-id="{{item.id}}">
+          <view class="action-stat" catchtap="onSharePost" data-id="{{item.id}}">
             <text class="action-icon">↗</text>
             <text class="action-count">分享</text>
           </view>

@@ -2,6 +2,6 @@
   "usingComponents": {
     "pet-chat-drawer": "/components/pet-chat-drawer/index"
   },
-  "navigationBarTitleText": "Voonie",
+  "navigationBarTitleText": "Voling 日记",
   "navigationStyle": "custom"
 }

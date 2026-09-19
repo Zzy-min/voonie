@@ -1,68 +1,58 @@
-<!-- pages/index/index.wxml -->
 <view class="voonie-page home-page">
-  <!-- 顶部状态栏与日期导航 -->
   <view class="home-header" style="padding-top: {{statusBarHeight}}px;">
     <view class="header-inner" style="height: {{navBarHeight}}px; padding-right: {{navRightPadding}}px;">
-      <view class="date-box">
+      <view>
         <text class="date-text">{{currentDateStr}}</text>
+        <text class="brand-text">Voling 日记</text>
       </view>
-      <view class="header-actions">
-        <view class="icon-btn" bindtap="onNotifyClick">
-          <image class="action-icon-svg" src="/assets/icons/icon-bell.svg" mode="aspectFit" />
+      <view class="icon-btn" bindtap="onNotifyClick">
+        <image src="/assets/icons/icon-bell.svg" mode="aspectFit" />
+      </view>
+    </view>
+  </view>
+
+  <scroll-view class="home-scroll" scroll-y>
+    <view class="hero">
+      <view class="hero-copy">
+        <text class="hero-title">今天过得怎么样？</text>
+        <text class="hero-subtitle">告诉 Vonnie，慢慢说就好。</text>
+      </view>
+      <image class="hero-vonnie voonie-mascot anim-breathe" src="/assets/images/voonie/voonie-sit.png" mode="aspectFit" bindtap="onDogTap" />
+      <view wx:if="{{showHeart}}" class="heart-burst">♡</view>
+      <button class="primary-record" bindtap="onStartRecord">
+        <image src="/assets/icons/icon-mic.svg" mode="aspectFit" />
+        <text>说给 Vonnie 听</text>
+      </button>
+      <view wx:if="{{hasDraft}}" class="draft-notice" bindtap="onResumeDraft">
+        <text>有一段记录还没完成</text><text>继续 ›</text>
+      </view>
+    </view>
+
+    <view class="section">
+      <view class="section-head"><text class="section-title">今天的记录</text></view>
+      <view wx:if="{{diaryLoading}}" class="state-row"><text>Vonnie 正在翻找今天的故事…</text></view>
+      <view wx:elif="{{diaryFailed}}" class="state-row state-action" bindtap="loadHomeDiaries"><text>暂时没取到记录，点此重试</text></view>
+      <view wx:elif="{{todayDiary}}" class="diary-row" bindtap="onOpenDiary" data-id="{{todayDiary.id}}">
+        <view class="diary-copy">
+          <text class="diary-mood">{{todayDiary.mood}}</text>
+          <text class="diary-title">{{todayDiary.title}}</text>
+          <text class="diary-summary">{{todayDiary.summary || todayDiary.full_content}}</text>
         </view>
+        <image wx:if="{{todayDiary.cover}}" class="diary-cover" src="{{todayDiary.cover}}" mode="aspectFill" />
+      </view>
+      <view wx:else class="empty-row" bindtap="onStartRecord">
+        <view><text class="empty-title">Vonnie 还没有收藏今天的故事。</text><text class="empty-copy">说说今天发生了什么吧。</text></view>
+        <text class="row-arrow">›</text>
       </view>
     </view>
-  </view>
 
-  <!-- 真实居室环境背景切片（对齐案例第二屏：落地百叶暖阳窗、挂画、小狗、地毯与生活小道具） -->
-    <image class="home-room-bg" src="/assets/images/ui/ui-bg-home.png" mode="aspectFill" />
-
-  <!-- 居室主场景与小狗 IP 交互层 -->
-  <view class="home-scene">
-    <!-- 问候气泡（对齐案例第二屏：今天过得怎么样？） -->
-    <view class="greeting-bubble" bindtap="openChat">
-      <text class="bubble-text">今天过得怎么样？</text>
-      <view class="bubble-arrow"></view>
-    </view>
-
-    <!-- 狗与地面道具已在 ui-bg-home 合成图内；此处仅保留点击热区，避免形象重叠 -->
-    <view class="dog-hero-container dog-hero-hotzone" bindtap="onDogTap">
-      <!-- 细腻柔和爱心微反馈，默认隐藏，拒绝原生大 emoji 噪音 -->
-      <view wx:if="{{showHeart}}" class="heart-burst">
-        <view class="heart-shape"></view>
+    <view class="section recent-section">
+      <view class="section-head"><text class="section-title">最近回忆</text><text class="section-link" bindtap="onOpenMemories">查看全部</text></view>
+      <view wx:if="{{recentDiary}}" class="memory-row" bindtap="onOpenDiary" data-id="{{recentDiary.id}}">
+        <image class="memory-cover" src="{{recentDiary.cover || '/assets/images/ui/illust-meadow.png'}}" mode="aspectFill" />
+        <view class="memory-copy"><text class="memory-date">{{recentDiary.date_label}}</text><text class="memory-title">{{recentDiary.title}}</text><text class="memory-summary">{{recentDiary.summary}}</text></view>
       </view>
+      <view wx:else class="state-row"><text>以后回头看，会从这里遇见过去的你。</text></view>
     </view>
-  </view>
-
-  <!-- 案例式底栏：一体化大圆角胶囊输入条 + 麦克风入口 -->
-  <view class="home-input-bar">
-    <!-- 草稿恢复提示条（弱化下移至输入胶囊正上方，不遮挡居室小狗与地毯） -->
-    <view wx:if="{{hasDraft}}" class="draft-notice" bindtap="onResumeDraft">
-      <text class="draft-icon">✏️</text>
-      <text class="draft-text">未完成草稿 · 点击继续</text>
-      <text class="draft-arrow">➔</text>
-    </view>
-    <view class="home-capsule-bar">
-      <view class="home-capsule-mic" bindtap="onMicTap">
-        <image class="capsule-mic-img" src="/assets/icons/icon-mic.svg" mode="aspectFit" />
-      </view>
-      <input
-        class="home-capsule-input"
-        placeholder="说说今天发生的事"
-        placeholder-class="home-input-placeholder"
-        confirm-type="send"
-        value="{{inputText}}"
-        bindinput="onInput"
-        bindconfirm="onInputSend"
-        adjust-position="{{true}}"
-        cursor-spacing="20"
-      />
-      <view wx:if="{{inputText}}" class="home-capsule-send" bindtap="onInputSend">
-        <text class="capsule-send-arrow">➔</text>
-      </view>
-    </view>
-  </view>
-
-  <!-- 挂载快捷聊天抽屉 -->
-  <pet-chat-drawer visible="{{chatVisible}}" bind:close="closeChat" />
+  </scroll-view>
 </view>

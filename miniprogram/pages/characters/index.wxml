@@ -1,0 +1,74 @@
+<view class="voonie-page voonie-page--no-tab character-page">
+  <view class="character-header" style="padding-top: {{statusBarHeight}}px;">
+    <view class="header-nav" style="height: {{navBarHeight}}px; padding-right: {{navRightPadding}}px;">
+      <view class="back-btn" bindtap="onBack"><image src="/assets/icons/icon-back.svg" mode="aspectFit" /></view>
+      <text class="header-title">角色集</text>
+    </view>
+    <text class="header-sub" style="padding-right: {{navRightPadding}}px;">选择主角后，新生成的日记会保持其外貌与画风。</text>
+  </view>
+
+  <scroll-view class="character-scroll" scroll-y>
+    <view class="section-heading official-heading">
+      <view><text class="section-title">官方角色</text><text class="section-note">选择后立即用于新日记</text></view>
+      <text class="default-link" bindtap="onUseDefault">恢复默认</text>
+    </view>
+    <view class="official-grid">
+        <view class="official-card {{activeId === 'official:' + item.id ? 'active' : ''}}" wx:for="{{officialCharacters}}" wx:key="id" data-id="{{item.id}}" bindtap="onSelectOfficial">
+          <image class="official-avatar" src="{{item.avatar}}" mode="aspectFill" />
+          <view class="official-copy">
+            <view class="official-name-row"><text class="official-name">{{item.name}}</text><text class="active-tag" wx:if="{{activeId === 'official:' + item.id}}">使用中</text></view>
+            <text class="official-tagline">{{item.tagline}}</text>
+            <text class="official-scene">{{item.recommendedFor}}</text>
+          </view>
+        </view>
+    </view>
+
+    <view class="section-heading custom-heading" bindtap="onToggleCreate">
+      <view><text class="section-title">自定义角色</text><text class="section-note">需要时再创建，不影响直接使用</text></view>
+      <text class="default-link">{{showCreate ? '收起' : '创建'}} ›</text>
+    </view>
+    <view class="create-section" wx:if="{{showCreate}}">
+      <text class="section-title">创建新主角</text>
+      <text class="create-hint">描述你希望出现在日记插图中的人类主人公；Vonnie 会作为独立的陪伴小狗出现。</text>
+      <view class="form-group">
+        <text class="field-label">角色名称</text>
+        <input class="form-input" value="{{name}}" placeholder="例如：小夏" placeholder-class="field-placeholder" maxlength="24" bindinput="onNameInput" />
+      </view>
+      <view class="form-group">
+        <text class="field-label">外貌特征</text>
+        <textarea class="appearance-input" value="{{appearance}}" placeholder="例如：棕色短发、圆眼镜、黄色连帽衫" placeholder-class="field-placeholder" maxlength="1000" bindinput="onAppearanceInput" />
+      </view>
+      <view class="style-row" bindtap="onChooseStyle"><text class="style-label">插画风格</text><text class="style-value">{{styleLabel}} <text class="style-arrow">›</text></text></view>
+      <button class="create-btn" loading="{{saving}}" bindtap="onCreate">创建并设为主角</button>
+    </view>
+
+    <view class="section-heading">
+      <text class="section-title">我的角色</text>
+    </view>
+    <view class="loading" wx:if="{{loading}}">正在打开角色集…</view>
+    <view class="empty error-box" wx:elif="{{loadError}}">
+      <text>角色集暂时打不开，多半是网络有点慢。</text>
+      <view class="retry-link" bindtap="onRetryLoad">再试一次</view>
+    </view>
+    <view class="empty" wx:elif="{{!characters.length}}">
+      <image class="empty-vonnie voonie-mascot" src="/assets/images/voonie/voonie-peek.png" mode="aspectFit" />
+      <text class="empty-title">还没有自定义主角</text>
+      <text class="empty-copy">填写上方信息创建角色，再为它上传参考图。</text>
+    </view>
+    <view class="character-list" wx:else>
+      <view class="character-row {{activeId === item.id ? 'active' : ''}}" wx:for="{{characters}}" wx:key="id" data-id="{{item.id}}" bindtap="onSelect">
+        <image class="character-cover" wx:if="{{item.cover}}" src="{{item.cover}}" mode="aspectFill" />
+        <view class="character-placeholder" wx:else>{{item.initial}}</view>
+        <view class="character-copy">
+          <view class="character-name-row"><text class="character-name">{{item.name}}</text><text class="active-tag" wx:if="{{activeId === item.id}}">当前主角</text></view>
+          <text class="character-desc">{{item.appearance_prompt}}</text>
+          <text class="reference-count">{{item.references.length}} / 5 张参考图</text>
+        </view>
+        <view class="character-actions">
+          <view class="upload-btn" catchtap="onUploadReference" data-id="{{item.id}}">+ 参考图</view>
+          <view class="delete-btn" catchtap="onDeleteCharacter" data-id="{{item.id}}">{{deletingId === item.id ? '删除中…' : '删除'}}</view>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+</view>

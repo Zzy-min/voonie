@@ -54,7 +54,7 @@ Component({
 
     onOpenBookshelf() {
       this.onClose();
-      wx.switchTab({
+      wx.navigateTo({
         url: "/pages/bookshelf/index",
       });
     },
@@ -86,7 +86,7 @@ Component({
         const petMsg = {
           id: "pet-" + Date.now(),
           role: "pet" as const,
-          content: res.reply || "汪！我一直在小主人身边哦🐾",
+          content: res.reply || "我在这里，慢慢说。",
         };
         const currentList = Array.isArray(this.data.messages) ? this.data.messages : [];
         const updated = [...currentList, petMsg];
@@ -99,7 +99,7 @@ Component({
         const fallbackMsg = {
           id: "pet-" + Date.now(),
           role: "pet" as const,
-          content: "虽然网络有点小波动，但我一直在听你说。小主人辛苦啦🐾",
+          content: "消息没有发送成功。检查网络后再试一次，刚才这条内容还没有交给 Vonnie。",
         };
         const currentList = Array.isArray(this.data.messages) ? this.data.messages : [];
         const updated = [...currentList, fallbackMsg];

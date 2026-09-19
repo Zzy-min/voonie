@@ -15,10 +15,14 @@
   </view>
 
   <scroll-view class="share-scroll-body" scroll-y>
+    <view class="share-content">
     <!-- 文字输入区域 -->
     <view class="text-input-card">
-      <view class="mini-author-bar">
-      <image class="mini-avatar" src="/assets/images/voonie/voonie-avatar.png" mode="aspectFill" />
+      <view class="section-heading">
+        <text class="section-title">日记正文</text>
+        <text class="section-hint">可在发布前编辑</text>
+      </view>
+      <view class="text-editor-wrap">
         <textarea
           class="share-textarea"
           placeholder="写下今天的温暖心情..."
@@ -37,7 +41,7 @@
 
     <!-- 微绘本插图预览与调整（默认使用对齐案例第10屏花田小狗插画） -->
     <view class="illustration-preview-card">
-        <image class="preview-img" src="{{illustrationUrl || '/assets/images/ui/illust-play-flowers.png'}}" mode="aspectFill" />
+        <image class="preview-img" src="{{illustrationUrl || '/assets/images/ui/illust-play-flowers.png'}}" mode="aspectFit" />
     </view>
 
     <!-- 案例式标签胶囊行 -->
@@ -70,9 +74,6 @@
       </view>
     </view>
 
-    <!-- 底部角落陪伴吉祥物（对齐案例第10屏右下角小狗） -->
-    <view class="share-corner-mascot">
-  <image class="corner-dog-img anim-breathe" src="/assets/images/voonie/voonie-peek.png" mode="aspectFit" />
     </view>
   </scroll-view>
 </view>

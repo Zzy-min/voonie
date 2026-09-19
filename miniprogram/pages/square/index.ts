@@ -25,6 +25,13 @@ Page({
   },
 
   onShow() {
+    const app = getApp();
+    if (app && app.globalData) app.globalData.activeTab = 3;
+    const tab = typeof this.getTabBar === "function" ? this.getTabBar() : null;
+    if (tab && typeof tab.setSelected === "function") tab.setSelected(3);
+    const mineOnly = Boolean(wx.getStorageSync("voling_square_mine_only"));
+    wx.removeStorageSync("voling_square_mine_only");
+    this.setData({ mineOnly });
     this.loadPosts();
   },
 
@@ -48,13 +55,11 @@ Page({
   },
 
   onBack() {
-    wx.navigateBack({
-      fail: () => wx.switchTab({ url: "/pages/bookshelf/index" }),
-    });
+    wx.switchTab({ url: "/pages/index/index" });
   },
 
   onChooseDiary() {
-    wx.switchTab({ url: "/pages/bookshelf/index" });
+    wx.navigateTo({ url: "/pages/bookshelf/index" });
   },
 
   async onLike(e: WechatMiniprogram.BaseEvent) {
@@ -81,6 +86,15 @@ Page({
   onPreview(e: WechatMiniprogram.BaseEvent) {
     const img = e.currentTarget.dataset.img;
     wx.previewImage({ urls: [img] });
+  },
+
+  onOpenPost(e: WechatMiniprogram.BaseEvent) {
+    const shareId = e.currentTarget.dataset.shareId;
+    if (!shareId) {
+      wx.showToast({ title: "这篇日记暂时无法打开", icon: "none" });
+      return;
+    }
+    wx.navigateTo({ url: `/pages/diary/index?shareId=${encodeURIComponent(shareId)}` });
   },
 
   onMoreAction(e: WechatMiniprogram.BaseEvent) {

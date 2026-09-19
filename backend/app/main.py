@@ -32,7 +32,8 @@ from voonie.backend.app.providers.embeddings import get_embedding_provider
 from voonie.backend.app.services.memory_service import MemoryService
 from voonie.backend.app.services.rate_limiter import RateLimiter
 from voonie.backend.app.services.pet_agent import PetCompanionAgent
-from voonie.backend.app.db.models import Base, Character, CharacterReference, DiaryArtifact, Panel, User
+from voonie.backend.app.services.job_recovery import recover_interrupted_jobs
+from voonie.backend.app.db.models import Base, Character, CharacterReference, DiaryArtifact, DiaryReference, Panel, User
 from voonie.backend.app.db.session import get_db
 
 WEB_DIR = Path(__file__).resolve().parents[2] / "web"
@@ -50,6 +51,13 @@ def build_lifespan(app_settings: Settings):
                 if await session.get(User, TEST_USER_ID) is None:
                     session.add(User(id=TEST_USER_ID, device_id="test-device"))
                     await session.commit()
+        if app_settings.ARQ_INLINE:
+            recovered_jobs = await recover_interrupted_jobs(app.state.db_session_factory)
+            if recovered_jobs:
+                logging.getLogger("voonie.jobs").warning(
+                    "Recovered %s interrupted inline jobs after process restart",
+                    recovered_jobs,
+                )
         http_client = httpx.AsyncClient()
         app.state.http_client = http_client
         if not app_settings.ARQ_INLINE:
@@ -107,7 +115,11 @@ def create_app(app_settings: Settings | None = None) -> FastAPI:
         allow_origins=app_settings.CORS_ORIGINS,
         allow_credentials=not wildcard_cors,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "Prefer", "Idempotency-Key"],
+        allow_headers=[
+            "Authorization", "Content-Type", "Prefer", "Idempotency-Key",
+            "X-Request-ID", "X-Trace-ID",
+        ],
+        expose_headers=["X-Request-ID", "X-Trace-ID"],
     )
 
     register_exception_handlers(app)
@@ -116,8 +128,10 @@ def create_app(app_settings: Settings | None = None) -> FastAPI:
 
     @app.middleware("http")
     async def structured_access_log(request: Request, call_next):
-        request_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex
+        request_id = (request.headers.get("X-Request-ID") or uuid.uuid4().hex)[:128]
+        trace_id = (request.headers.get("X-Trace-ID") or request_id)[:128]
         request.state.request_id = request_id
+        request.state.trace_id = trace_id
         started = time.perf_counter()
         response = None
         status_code = 500
@@ -128,9 +142,11 @@ def create_app(app_settings: Settings | None = None) -> FastAPI:
         finally:
             if response is not None:
                 response.headers["X-Request-ID"] = request_id
+                response.headers["X-Trace-ID"] = trace_id
             access_logger.info(json.dumps({
                 "event": "http_request",
                 "request_id": request_id,
+                "trace_id": trace_id,
                 "user_id": getattr(request.state, "user_id", None),
                 "job_id": getattr(request.state, "job_id", None),
                 "stage": "request_complete",
@@ -150,8 +166,9 @@ def create_app(app_settings: Settings | None = None) -> FastAPI:
     app.include_router(characters.router, prefix=app_settings.API_PREFIX)
     app.include_router(artifacts.router, prefix=app_settings.API_PREFIX)
     app.include_router(daily.router, prefix=app_settings.API_PREFIX)
-    from voonie.backend.app.api.routers import me
+    from voonie.backend.app.api.routers import feedback, me
     app.include_router(me.router, prefix=app_settings.API_PREFIX)
+    app.include_router(feedback.router, prefix=app_settings.API_PREFIX)
     from voonie.backend.app.api.routers import shares
     app.include_router(shares.router, prefix=app_settings.API_PREFIX)
     app.include_router(diary_router.router, prefix=app_settings.API_PREFIX)
@@ -185,6 +202,10 @@ def create_app(app_settings: Settings | None = None) -> FastAPI:
             .where(Character.user_id == current_user.id)
         )).all()
         owned_keys.update(character_keys)
+        diary_reference_keys = (await db.scalars(
+            select(DiaryReference.media_key).where(DiaryReference.user_id == current_user.id)
+        )).all()
+        owned_keys.update(diary_reference_keys)
         matched = next((key for key in owned_keys if Path(key).name == filename), None)
         if matched is None:
             raise ApiError(404, "media_not_found", "Media not found")

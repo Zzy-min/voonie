@@ -14,6 +14,7 @@ from voonie.backend.app.core.config import Settings
 from voonie.backend.app.db.models import Base, DiaryArtifact
 from voonie.backend.app.main import create_app
 from voonie.backend.app.models.schemas import CharacterConfig, ComicPanel
+from voonie.backend.app.schemas.characters import CharacterCreate
 from voonie.backend.app.services.prompt_builder import build_panel_prompt
 from voonie.backend.app.workers.storybook_job import page_count_for
 
@@ -99,6 +100,24 @@ def test_prompt_builder_locks_character_traits():
     assert "No speech balloons" in prompt
 
 
+def test_default_bible_follows_each_selected_protagonist_without_legacy_traits():
+    prompt = build_panel_prompt(
+        ComicPanel(panel_id=1, scene_desc="quiet library", character_action="reading by a window"),
+        CharacterConfig(
+            character_name="阿澈",
+            appearance_prompt="a young East Asian man with neat black hair and a sage cardigan",
+            style_preset="warm_watercolor",
+        ),
+        "warm watercolor storybook",
+    )
+    assert "a young East Asian man with neat black hair and a sage cardigan" in prompt
+    assert "hair: follow the main protagonist description exactly" in prompt
+    assert "outfit: follow the main protagonist description exactly" in prompt
+    assert "short brown hair" not in prompt
+    assert "yellow hoodie" not in prompt
+    assert "Do not replace the protagonist with another person" in prompt
+
+
 def test_page_count_follows_confirmed_entry_volume():
     assert page_count_for(0) == 0
     assert page_count_for(1) == 4
@@ -121,6 +140,7 @@ def test_diary_edit_preserves_images_and_rejects_stale_or_foreign_updates(mvp_cl
     job_id = queued.json()["job_id"]
     before = mvp_client.get(f"/api/v1/diaries/{job_id}", headers=owner).json()
     assert before["entry_date"].startswith("2026-09-13T10:00:00")
+    assert before["entry_date"].endswith("+00:00")
     assert before["timezone"] == "Asia/Shanghai"
     before_images = [panel.get("image_url") for panel in before["panels"]]
 
@@ -176,6 +196,53 @@ def test_entry_comic_job_and_single_panel_retry(mvp_client):
     assert updated["panels"][0]["storyboard"] == original_keys[0]["storyboard"]
 
 
+def test_diary_reference_is_persisted_renderable_and_deleted_with_diary(mvp_client):
+    headers = auth_headers(mvp_client, "diary-reference-owner")
+    entry_id = create_entry(
+        mvp_client,
+        headers,
+        "diary-reference-entry",
+        "早晨我在窗边喝咖啡。\n\n下午和小狗去公园散步，晚霞很温柔。",
+        "2026-09-18T10:00:00Z",
+    )
+    upload = mvp_client.post(
+        f"/api/v1/entries/{entry_id}/references",
+        headers=headers,
+        files={"image_file": ("memory.png", png_bytes(), "image/png")},
+        data={
+            "reference_type": "scene",
+            "include_in_content": "true",
+            "paragraph_anchor": "下午和小狗去公园散步",
+        },
+    )
+    assert upload.status_code == 201
+    reference = upload.json()
+    stored_path = Path(mvp_client.app.state.settings.TEMP_MEDIA_DIR) / Path(reference["image_url"]).name
+    assert stored_path.is_file()
+
+    queued = mvp_client.post(
+        f"/api/v1/entries/{entry_id}/comic-jobs",
+        headers=headers | {"Idempotency-Key": "diary-reference-comic"},
+        json={"reference_id": reference["id"]},
+    )
+    assert queued.status_code == 202
+    completed = wait_for_job(mvp_client, queued.json()["job_id"], headers)
+    assert completed["status"] == "done"
+    detail = mvp_client.get(f"/api/v1/diaries/{queued.json()['job_id']}", headers=headers)
+    assert detail.status_code == 200
+    assert detail.json()["reference_images"] == [{
+        "id": reference["id"],
+        "image_url": reference["image_url"],
+        "reference_type": "scene",
+        "include_in_content": True,
+        "paragraph_anchor": "下午和小狗去公园散步",
+    }]
+
+    assert mvp_client.delete(f"/api/v1/diaries/{queued.json()['job_id']}", headers=headers).status_code == 204
+    assert not stored_path.exists()
+    assert mvp_client.get(f"/api/v1/entries/{entry_id}", headers=headers).status_code == 404
+
+
 def test_character_snapshot_survives_later_edits(mvp_client):
     headers = auth_headers(mvp_client, "mvp-character")
     created = mvp_client.post("/api/v1/characters", headers=headers, json={
@@ -198,7 +265,7 @@ def test_character_snapshot_survives_later_edits(mvp_client):
     job = mvp_client.post(
         f"/api/v1/entries/{entry_id}/comic-jobs",
         headers=headers,
-        json={"text": "ignored", "character": {"character_name": "小夏", "appearance_prompt": "a girl with brown bob hair and yellow hoodie"}},
+        json={"character_id": character_id},
     )
     completed = wait_for_job(mvp_client, job.json()["job_id"], headers)
     artifact_id = completed["result"]["artifact_id"]
@@ -209,6 +276,28 @@ def test_character_snapshot_survives_later_edits(mvp_client):
     assert mvp_client.delete(
         f"/api/v1/characters/{character_id}/references/{reference_id}", headers=headers
     ).status_code == 204
+
+
+def test_character_delete_removes_references_and_is_user_scoped(mvp_client):
+    owner_headers = auth_headers(mvp_client, "character-delete-owner")
+    other_headers = auth_headers(mvp_client, "character-delete-other")
+    created = mvp_client.post("/api/v1/characters", headers=owner_headers, json={
+        "name": "临时主角",
+        "appearance_prompt": "a human protagonist in a blue coat",
+    })
+    character_id = created.json()["id"]
+    uploaded = mvp_client.post(
+        f"/api/v1/characters/{character_id}/references",
+        headers=owner_headers,
+        files={"image_file": ("front.png", png_bytes(), "image/png")},
+        data={"kind": "front"},
+    )
+    stored_path = Path(mvp_client.app.state.settings.TEMP_MEDIA_DIR) / Path(uploaded.json()["media_key"]).name
+    assert stored_path.exists()
+    assert mvp_client.delete(f"/api/v1/characters/{character_id}", headers=other_headers).status_code == 404
+    assert mvp_client.delete(f"/api/v1/characters/{character_id}", headers=owner_headers).status_code == 204
+    assert not stored_path.exists()
+    assert mvp_client.get("/api/v1/characters", headers=owner_headers).json() == []
 
 
 def test_daily_storybook_versions_and_empty_day(mvp_client):
@@ -246,6 +335,9 @@ def test_prompt_builder_dog_consistency_and_ref_image():
         "chibi manga",
     )
     assert "Companion Pet: a cute cheerful fluffy orange-and-white puppy named Voonie" in prompt_dog
+    assert "The main protagonist is a human person with normal human anatomy" in prompt_dog
+    assert "Never add animal ears" in prompt_dog
+    assert "human-animal hybrid" in prompt_dog
 
     # Test reference image condition
     prompt_ref = build_panel_prompt(
@@ -254,7 +346,19 @@ def test_prompt_builder_dog_consistency_and_ref_image():
         "chibi manga",
         use_ref=True,
     )
-    assert "【STRICT VISUAL REFERENCE】" in prompt_ref
+    assert "【STRICT CHARACTER REFERENCE】" in prompt_ref
+    assert "same face, gender presentation, apparent age, hairstyle" in prompt_ref
+
+
+def test_new_custom_character_defaults_do_not_force_the_legacy_girl():
+    body = CharacterCreate(
+        name="阿澈",
+        appearance_prompt="a young man with black hair and a sage cardigan",
+    )
+    assert body.bible.hair == "follow the main protagonist description exactly"
+    assert body.bible.outfit == "follow the main protagonist description exactly"
+    assert body.bible.body == "natural human anatomy"
+    assert "round glasses" not in body.bible.features
 
 
 def test_diary_single_panel_regeneration(mvp_client):
@@ -270,6 +374,17 @@ def test_diary_single_panel_regeneration(mvp_client):
     old_panel2_url = diary["panels"][1]["image_url"]
     original_created_at = diary["created_at"]
 
+    class RecordingImageProvider:
+        def __init__(self):
+            self.calls = []
+
+        async def generate(self, prompt, *, ref_image, seed):
+            self.calls.append({"prompt": prompt, "ref_image": ref_image, "seed": seed})
+            return png_bytes()
+
+    provider = RecordingImageProvider()
+    mvp_client.app.state.image_service.provider = provider
+
     # Regenerate panel 2
     regen_response = mvp_client.post(
         f"/api/v1/diaries/{job_id}/panels/2/regenerate",
@@ -281,3 +396,5 @@ def test_diary_single_panel_regeneration(mvp_client):
     assert len(updated["panels"]) == 2
     assert updated["panels"][1]["image_url"] != old_panel2_url
     assert updated["created_at"] == original_created_at
+    assert provider.calls[0]["ref_image"]
+    assert "【STRICT CHARACTER REFERENCE】" in provider.calls[0]["prompt"]

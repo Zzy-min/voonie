@@ -18,6 +18,8 @@ interface DayMemory {
   mood: string;
   time: string;
   image_url: string;
+  summary: string;
+  imageCount: number;
 }
 
 // 本地日历 YYYY-MM-DD
@@ -48,23 +50,27 @@ Page({
     dayMemories: [] as DayMemory[],
     loading: true,
     failed: false,
+    scrollTop: 0,
   },
 
   // 后端按业务 entry_date 聚合：key -> DiaryItem[]
   diariesByDate: {} as Record<string, DiaryItem[]>,
   allDiaries: [] as DiaryItem[],
   _initedOnce: false as boolean,
+  stateKey: "voling_calendar_state",
 
   onLoad() {
     const nav = getNavInfo();
     const now = new Date();
+    const saved = wx.getStorageSync(this.stateKey) || {};
     this.setData({
       statusBarHeight: nav.statusBarHeight,
       navBarHeight: nav.navBarHeight,
       navRightPadding: nav.navRightPadding,
-      year: now.getFullYear(),
-      month: now.getMonth() + 1,
-      selectedDate: now.getDate(),
+      year: Number(saved.year) || now.getFullYear(),
+      month: Number(saved.month) || now.getMonth() + 1,
+      selectedDate: Number(saved.selectedDate) || now.getDate(),
+      scrollTop: Number(saved.scrollTop) || 0,
       todayKey: toDateKey(now),
     });
     this.generateCalendar();
@@ -72,8 +78,8 @@ Page({
   },
 
   onShow() {
-    // 日历是子页（非 Tab 根页）：不调用 TabBar setSelected。
-    // 首次 onLoad 已请求数据，onShow 仅在非首次时刷新，避免从子页返回后日记缺失。
+    // 回忆日历属于日记模块的子页，不占用根 Tab。
+    // 首次 onLoad 已请求数据，后续回到页面时刷新。
     if (this._initedOnce) {
       this.fetchDiaries();
     }
@@ -189,7 +195,9 @@ Page({
   async renderTodayMemories() {
     const { year, month, selectedDate } = this.data;
     const key = `${year}-${pad(month)}-${pad(selectedDate)}`;
-    const diaries = this.diariesByDate[key] || [];
+    const diaries = [...(this.diariesByDate[key] || [])].sort((a, b) =>
+      new Date(b.entry_date || b.created_at || 0).getTime() - new Date(a.entry_date || a.created_at || 0).getTime()
+    );
 
     const mem: DayMemory[] = await Promise.all(diaries.map(async (d) => ({
       id: d.id,
@@ -200,6 +208,8 @@ Page({
         d.panels && d.panels[0]?.image_url
           ? await authenticatedMediaUrl(d.panels[0].image_url)
           : "/assets/images/ui/card-sleep-cushion.png",
+      summary: (d.full_content || d.summary || "").replace(/\s+/g, " ").slice(0, 68),
+      imageCount: Array.isArray(d.panels) ? d.panels.filter((panel) => panel.image_url).length : 0,
     })));
 
     this.setData({
@@ -221,23 +231,14 @@ Page({
     const dayNum = Number(day);
     if (!dayNum || dayNum < 1) return;
     const { year, month } = this.data;
-    const key = `${year}-${pad(month)}-${pad(dayNum)}`;
-    const diaries = this.diariesByDate[key] || [];
-
     // 更新选中态
     const updated = this.data.calendarDays.map((d) => ({
       ...d,
       isSelected: d.isCurrentMonth && d.day === dayNum,
     }));
     this.setData({ selectedDate: dayNum, calendarDays: updated });
-
-    // 有日记：进入当日最新一篇的日记详情（多篇进最新，列表见可选改动）
-    if (diaries.length > 0) {
-      const open = diaries[diaries.length - 1];
-      wx.navigateTo({ url: `/pages/diary/index?id=${open.id}` });
-      return;
-    }
-    // 无日记：展示空态
+    this.persistState({ selectedDate: dayNum });
+    // 日期只负责筛选。即使只有一篇，也先展示当天列表，不自动进入详情。
     this.renderTodayMemories();
   },
 
@@ -266,6 +267,7 @@ Page({
     const daysInMonth = new Date(year, month, 0).getDate();
     const selectedDate = Math.min(this.data.selectedDate, daysInMonth);
     this.setData({ year, month, selectedDate });
+    this.persistState({ year, month, selectedDate });
     this.generateCalendar();
     this.renderTodayMemories();
   },
@@ -278,6 +280,7 @@ Page({
       success: (res) => {
         const target = cur - 2 + res.tapIndex;
         this.setData({ year: target });
+        this.persistState({ year: target });
         this.generateCalendar();
         this.renderTodayMemories();
       },
@@ -301,6 +304,27 @@ Page({
 
   onRetryMemories() {
     this.fetchDiaries();
+  },
+
+  onWriteSelectedDay() {
+    const { year, month, selectedDate } = this.data;
+    wx.setStorageSync("voling_record_date", `${year}-${pad(month)}-${pad(selectedDate)}`);
+    wx.navigateTo({ url: "/pages/record/index" });
+  },
+
+  onCalendarScroll(e: WechatMiniprogram.CustomEvent) {
+    const scrollTop = Number((e.detail as any).scrollTop) || 0;
+    this.setData({ scrollTop });
+    this.persistState({ scrollTop });
+  },
+
+  persistState(patch: Record<string, number>) {
+    wx.setStorageSync(this.stateKey, Object.assign({
+      year: this.data.year,
+      month: this.data.month,
+      selectedDate: this.data.selectedDate,
+      scrollTop: this.data.scrollTop,
+    }, patch));
   },
 
   onSearchClick() {

@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any
 from voonie.backend.app.core.config import Settings, settings
 from voonie.backend.app.models.schemas import ComicPanel, CharacterConfig
 from voonie.backend.app.providers.image import (
@@ -28,6 +29,8 @@ class ImageGenService:
         character: CharacterConfig,
         custom_style: str = None,
         ref_image: bytes | None = None,
+        character_bible: dict[str, Any] | None = None,
+        seed: int | None = None,
     ) -> tuple[Path, str]:
         style_prompt = custom_style or self.settings.STYLE_PRESETS.get(
             character.style_preset,
@@ -37,21 +40,21 @@ class ImageGenService:
             panel,
             character,
             style_prompt,
-            getattr(character, "bible", None),
+            character_bible,
             use_ref=bool(ref_image),
         )
         try:
-            image_bytes = await self.provider.generate(full_prompt, ref_image=ref_image, seed=None)
+            image_bytes = await self.provider.generate(full_prompt, ref_image=ref_image, seed=seed)
         except ImagePromptRejectedError:
             full_prompt = build_panel_prompt(
                 panel,
                 character,
                 style_prompt,
-                getattr(character, "bible", None),
+                character_bible,
                 use_ref=bool(ref_image),
                 abstract=True,
             )
-            image_bytes = await self.provider.generate(full_prompt, ref_image=ref_image, seed=None)
+            image_bytes = await self.provider.generate(full_prompt, ref_image=ref_image, seed=seed)
         path = self.storage.save_bytes(image_bytes, suffix=".png")
         return path, full_prompt
 

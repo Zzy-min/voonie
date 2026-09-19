@@ -11,18 +11,25 @@
     "pages/diary/index",
     "pages/diary-edit/index",
     "pages/record/index",
+    "pages/characters/index",
+    "pages/account-security/index",
+    "pages/feedback/index",
+    "pages/legal/index",
     "pages/share/index",
     "pages/square/index"
   ],
   "window": {
     "backgroundTextStyle": "dark",
     "navigationBarBackgroundColor": "#FAF7F0",
-    "navigationBarTitleText": "Voonie",
+    "navigationBarTitleText": "Voling 日记",
     "navigationBarTextStyle": "black",
     "backgroundColor": "#FAF7F0"
   },
   "networkTimeout": {
-    "uploadFile": 95000
+    "request": 25000,
+    "connectSocket": 25000,
+    "uploadFile": 95000,
+    "downloadFile": 25000
   },
   "tabBar": {
     "custom": true,
@@ -44,8 +51,8 @@
         "text": "萌宠"
       },
       {
-        "pagePath": "pages/bookshelf/index",
-        "text": "书架"
+        "pagePath": "pages/square/index",
+        "text": "广场"
       },
       {
         "pagePath": "pages/profile/index",
@@ -55,10 +62,13 @@
   },
   "permission": {
     "scope.record": {
-      "desc": "Voonie 需要使用您的麦克风来录制温暖的语音日记并转录"
+      "desc": "Voling 日记需要使用麦克风，将你说给 Vonnie 的内容整理成日记"
     },
     "scope.writePhotosAlbum": {
-      "desc": "Voonie 需要访问您的相册以保存精美的微绘本手帐卡片"
+      "desc": "Voling 日记需要访问相册，以保存你的日记与绘本"
+    },
+    "scope.camera": {
+      "desc": "仅在你主动拍摄参考图或反馈截图时使用摄像头"
     }
   },
   "style": "v2",

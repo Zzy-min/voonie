@@ -30,6 +30,18 @@ class SharePostResponse(BaseModel):
     is_owner: bool
 
 
+class ShareDetailResponse(BaseModel):
+    id: str
+    artifact_id: str
+    author: str
+    title: str
+    content: str
+    mood: str
+    image_urls: list[str]
+    created_at: datetime
+    is_owner: bool
+
+
 class ReactionResponse(BaseModel):
     active: bool
     count: int

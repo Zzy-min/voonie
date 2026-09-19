@@ -11,7 +11,7 @@ from voonie.backend.app.core.exceptions import ApiError
 from voonie.backend.app.db.models import DiaryArtifact, Panel, SharePost, ShareReaction, ShareReport, User
 from voonie.backend.app.db.session import get_db
 from voonie.backend.app.schemas.shares import (
-    ReactionResponse, SharePostResponse, ShareReportCreate, ShareReportResponse,
+    ReactionResponse, ShareDetailResponse, SharePostResponse, ShareReportCreate, ShareReportResponse,
     ShareUpsert, ShareVisibilityUpdate,
 )
 
@@ -31,8 +31,12 @@ async def serialize(post: SharePost, viewer_id: str, db: AsyncSession) -> ShareP
     ))).all())
     image_url = f"/api/v1/shares/{post.id}/media/{panel.image_key.rsplit('/', 1)[-1]}" if panel and panel.image_key else None
     return SharePostResponse(
-        id=post.id, artifact_id=post.artifact_id, author=author.nickname if author else "小主人",
-        caption=post.caption, tags=post.tags_json, mood=artifact.emotion_label if artifact else "平静",
+        # 对外一直使用可被 /diaries/{id} 打开的 job_id，不泄露内部主键。
+        id=post.id, artifact_id=artifact.job_id if artifact else post.artifact_id,
+        author=author.nickname if author else "小主人",
+        # 广场卡片展示日记正文；历史数据无正文时才回退到发布文字。
+        caption=(artifact.transcript_redacted or post.caption)[:500] if artifact else post.caption,
+        tags=post.tags_json, mood=artifact.emotion_label if artifact else "平静",
         image_url=image_url, is_public=post.is_public, hide_date=post.hide_date,
         created_at=post.created_at, likes=counts.get("like", 0), collects=counts.get("collect", 0),
         is_liked="like" in mine, is_collected="collect" in mine,
@@ -72,6 +76,35 @@ async def list_shares(order: str = "recommend", current_user: User = Depends(get
     if order == "recommend":
         items.sort(key=lambda item: (item.likes + item.collects * 2, item.created_at), reverse=True)
     return items
+
+
+@router.get("/{post_id}", response_model=ShareDetailResponse)
+async def get_public_share(post_id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    post = await db.scalar(select(SharePost).where(SharePost.id == post_id, SharePost.is_public.is_(True)))
+    if post is None:
+        raise ApiError(404, "share_not_found", "Share not found")
+    artifact = await db.get(DiaryArtifact, post.artifact_id)
+    author = await db.get(User, post.user_id)
+    if artifact is None:
+        raise ApiError(404, "diary_not_found", "Diary not found")
+    panels = list((await db.scalars(
+        select(Panel).where(Panel.artifact_id == artifact.id).order_by(Panel.panel_no)
+    )).all())
+    image_urls = [
+        f"/api/v1/shares/{post.id}/media/{panel.image_key.rsplit('/', 1)[-1]}"
+        for panel in panels if panel.image_key
+    ]
+    return ShareDetailResponse(
+        id=post.id,
+        artifact_id=artifact.job_id,
+        author=author.nickname if author else "小主人",
+        title=artifact.title,
+        content=(artifact.transcript_redacted or post.caption),
+        mood=artifact.emotion_label,
+        image_urls=image_urls,
+        created_at=post.created_at,
+        is_owner=post.user_id == current_user.id,
+    )
 
 
 @router.patch("/{post_id}", response_model=SharePostResponse)

@@ -1,82 +1,99 @@
 <!-- pages/record/index.wxml -->
 <view class="voonie-page voonie-page--no-tab record-page">
-  <!-- 柔和纸质温润场景背景切片（对齐案例第4屏） -->
   <image class="record-bg" src="/assets/images/ui/ui-bg-record.png" mode="aspectFill" />
 
-  <!-- 顶部导航与温馨文案 -->
   <view class="record-header" style="padding-top: {{statusBarHeight}}px;">
     <view class="header-nav" style="height: {{navBarHeight}}px; padding-right: {{navRightPadding}}px;">
       <view class="back-btn" bindtap="onBack">
         <image class="back-icon-svg" src="/assets/icons/icon-back.svg" mode="aspectFit" />
       </view>
       <view class="header-titles">
-        <text class="record-title">我在听</text>
-        <text class="record-subtitle">慢慢说，Voonie 一直在这里</text>
+        <text class="record-title">{{isRecording ? (isPaused ? '先停一下' : 'Vonnie 在听') : '把今天告诉 Vonnie'}}</text>
+        <text class="record-subtitle">{{isRecording ? '可以说完再点完成，中途能暂停' : '先说或先写，文字会留在这里给你看'}}</text>
       </view>
-    </view>
-
-    <!-- 灵感提示小胶囊 (贴近案例第四屏图文转写气泡) -->
-    <view class="inspiration-box" bindtap="onSwitchInspiration">
-      <view class="inspiration-content">
-        <text class="inspiration-text">{{currentInspiration}}</text>
-        <text class="transcribe-tag">✦ 由图文转写</text>
-      </view>
-      <text class="inspiration-refresh">↺</text>
     </view>
   </view>
 
-  <!-- 倾听态小狗与波形 -->
-  <view class="record-stage">
-    <!-- 侧耳倾听小狗 (无白边透明高保真切片) -->
-    <view class="listening-dog-box">
-    <image class="listening-dog-img voonie-mascot voonie-mascot--hero anim-breathe" src="/assets/images/voonie/voonie-listen.png" mode="aspectFit" />
+  <scroll-view class="record-body" scroll-y>
+    <view class="record-stage {{draftText ? 'compact' : ''}}">
+      <view class="listening-dog-box">
+        <image class="listening-dog-img voonie-mascot voonie-mascot--hero anim-breathe" src="/assets/images/voonie/voonie-listen.png" mode="aspectFit" />
+      </view>
+      <view class="waveform-container">
+        <block wx:for="{{waveAmps}}" wx:key="index">
+          <view class="wave-bar {{isRecording && !isPaused ? 'active' : ''}}" style="height: {{item}}rpx;"></view>
+        </block>
+      </view>
+      <view class="timer-box">
+        <text class="timer-text">{{durationText}}</text>
+      </view>
+      <view class="status-hint">
+        <text wx:if="{{isUploading}}">正在把语音听写成文字…</text>
+        <text wx:elif="{{uploadFailed}}">录音已保存在本机，可重新听写</text>
+        <text wx:elif="{{isPaused}}">已暂停，点继续接着说</text>
+        <text wx:elif="{{isRecording}}">正在听。想停就点暂停，说完点完成</text>
+        <text wx:elif="{{draftText}}">下面是你刚才说的/写的，可以改完再整理</text>
+        <text wx:else>点橙色按钮开始说，或直接在下方写</text>
+      </view>
+      <button wx:if="{{uploadFailed}}" class="retry-upload-btn" loading="{{isUploading}}" disabled="{{isUploading}}" bindtap="onRetryUpload">重新听写</button>
     </view>
 
-    <!-- 录音活动状态指示，不冒充实时音量波形 -->
-    <view class="waveform-container">
-      <block wx:for="{{waveAmps}}" wx:key="index">
-        <view class="wave-bar {{isRecording && !isPaused ? 'active' : ''}}" style="height: {{item}}rpx;"></view>
-      </block>
+    <view class="transcript-card">
+      <text class="transcript-label">{{draftText ? '你写下的内容' : '今天想记下的话'}}</text>
+      <textarea
+        class="transcript-textarea"
+        value="{{draftText}}"
+        placeholder="这里会显示你说的话，也可以直接写。"
+        maxlength="20000"
+        auto-height
+        show-confirm-bar="false"
+        adjust-position
+        cursor-spacing="24"
+        disabled="{{isRecording || isUploading}}"
+        bindinput="onDraftTextInput"
+      />
     </view>
-
-    <!-- 计时器 -->
-    <view class="timer-box">
-      <text class="timer-text">{{durationText}}</text>
-    </view>
-
-    <!-- 状态小提示 -->
-    <view class="status-hint">
-      <text wx:if="{{uploadFailed}}">录音已保存在本机，可重新上传</text>
-      <text wx:if="{{isPaused}}">录音已暂停，点击继续</text>
-      <text wx:elif="{{isRecording}}">正在倾听你的声音……</text>
-      <text wx:elif="{{!uploadFailed}}">准备好就可以开始啦</text>
-    </view>
-    <button wx:if="{{uploadFailed}}" class="retry-upload-btn" loading="{{isUploading}}" disabled="{{isUploading}}" bindtap="onRetryUpload">重新上传</button>
-  </view>
-
-  <!-- 底部录音控制器 -->
-  <view class="record-controls-bar">
-    <!-- 左侧：暂停 / 继续 -->
-    <view class="control-action-btn {{!isRecording ? 'disabled' : ''}}" bindtap="onTogglePause"
-      aria-role="button" aria-disabled="{{!isRecording}}"
-      aria-label="{{!isRecording ? '暂停录音，不可用' : (isPaused ? '继续录音' : '暂停录音')}}">
-      <text class="action-icon">{{isPaused ? '▶' : '⏸'}}</text>
-    </view>
-
-    <!-- 中间：大主按键 “结束了” -->
-    <view class="finish-btn-wrap {{isStarting || isUploading ? 'disabled' : ''}}" bindtap="onPrimaryRecordTap"
-      aria-role="button" aria-disabled="{{isStarting || isUploading}}"
-      aria-label="{{isUploading ? '正在上传录音' : (isStarting ? '正在准备录音' : (isRecording ? '结束录音' : '开始录音'))}}">
-      <view class="finish-btn-pulse {{isRecording && !isPaused ? 'anim-pulse' : ''}}"></view>
-      <view class="finish-btn">
-        <text class="finish-label">{{isStarting ? '准备中' : (isRecording ? '结束了' : '开始说')}}</text>
+    <view class="reference-card">
+      <view class="reference-head">
+        <view><text class="reference-title">日记参考图</text><text class="reference-sub">可选，生成插图时会真实传给 AI</text></view>
+        <text class="reference-type" wx:if="{{referencePath}}" bindtap="onChooseReferenceType">{{referenceTypeLabel}} ›</text>
+      </view>
+      <view class="reference-empty" wx:if="{{!referencePath}}" bindtap="onChooseReference">＋ 从相册选择或拍照</view>
+      <view class="reference-preview" wx:else>
+        <image src="{{referencePath}}" mode="aspectFill" />
+        <view class="reference-actions"><text bindtap="onChooseReference">更换</text><text class="danger" bindtap="onRemoveReference">移除</text></view>
+      </view>
+      <view class="reference-content-option" wx:if="{{referencePath}}">
+        <view><text class="option-title">插入日记正文</text><text class="option-sub">生成后按内容语义放到合适段落</text></view>
+        <switch checked="{{referenceIncludeInContent}}" color="#E8A74C" bindchange="onReferenceContentChange" />
       </view>
     </view>
+  </scroll-view>
 
-    <!-- 右侧：重新录制 -->
-    <view class="control-action-btn" bindtap="onResetRecord" aria-role="button" aria-label="重新录制">
-      <text class="action-icon">↺</text>
-      <text class="btn-subtext">重新录制</text>
+  <view class="record-dock">
+    <view wx:if="{{isRecording}}" class="recording-actions">
+      <view class="dock-btn pause-btn" bindtap="onTogglePause" aria-role="button">
+        <text class="dock-btn-title">{{isPaused ? '继续' : '暂停'}}</text>
+        <text class="dock-btn-sub">{{isPaused ? '接着刚才说' : '先停一下'}}</text>
+      </view>
+      <view class="dock-btn stop-btn {{isUploading ? 'disabled' : ''}}" bindtap="onFinishRecord" aria-role="button">
+        <text class="dock-btn-title">完成</text>
+        <text class="dock-btn-sub">听写成文字</text>
+      </view>
+    </view>
+    <view wx:else class="compose-actions">
+      <view
+        class="start-voice-btn {{isUploading || textSubmitting ? 'disabled' : ''}}"
+        bindtap="onPrimaryRecordTap"
+        aria-role="button"
+        aria-label="开始说话"
+      >
+        <image src="/assets/icons/icon-mic.svg" mode="aspectFit" />
+        <text>开始说</text>
+      </view>
+      <view class="send-diary-btn {{draftText.length >= 2 && !textSubmitting && !isUploading ? 'active' : ''}}" bindtap="onSubmitText" aria-role="button">
+        <text>{{textSubmitting ? '整理中…' : '整理成日记'}}</text>
+      </view>
     </view>
   </view>
 </view>

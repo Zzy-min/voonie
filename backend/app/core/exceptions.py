@@ -12,11 +12,13 @@ class ApiError(Exception):
         message: str,
         *,
         details: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         self.status_code = status_code
         self.code = code
         self.message = message
         self.details = details
+        self.headers = headers or {}
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -25,5 +27,8 @@ def register_exception_handlers(app: FastAPI) -> None:
         error: dict[str, Any] = {"code": exc.code, "message": exc.message}
         if exc.details is not None:
             error["details"] = exc.details
-        return JSONResponse(status_code=exc.status_code, content={"error": error})
-
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"error": error},
+            headers=exc.headers,
+        )

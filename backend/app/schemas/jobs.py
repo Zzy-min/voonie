@@ -14,9 +14,11 @@ class ComicJobRequest(BaseModel):
 
 
 class EntryComicJobRequest(BaseModel):
+    character_id: str | None = Field(default=None, max_length=36)
     character: CharacterConfig = Field(default_factory=CharacterConfig)
     custom_style: str | None = Field(default=None, max_length=2000)
     ref_image_b64: str | None = Field(default=None)
+    reference_id: str | None = Field(default=None, max_length=36)
 
 
 class JobQueuedResponse(BaseModel):

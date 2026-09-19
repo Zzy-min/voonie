@@ -4,6 +4,7 @@ import re
 from voonie.backend.app.core.config import Settings, settings
 from voonie.backend.app.models.schemas import CharacterConfig, Storyboard
 from voonie.backend.app.providers.llm import LLMProvider, get_llm_provider
+from voonie.backend.app.services.diary_layout import paragraphize_diary
 
 
 class StoryboardAgent:
@@ -15,7 +16,8 @@ class StoryboardAgent:
 4. 只挑选指定数量、视觉与情绪价值最高的真实瞬间作为记忆插图。每张图必须提供 source_excerpt 和 organized_diary 中可直接定位的 anchor_text。
 5. 插图不是绘本故事，不要补剧情，不要机械覆盖每件事；信息不足时使用抽象情绪画面。
 6. 同一篇日记的人物、画风、配色和时间氛围必须连续；画面内不要生成文字或气泡。
-7. 输出一句 20-40 字、不过度分析的小宠物暖心便签。
+7. 主人公始终是“主人公漫画设定”中的同一个人。除非用户原话明确提到另一人物，否则画面中不得新增第二个人；若确有配角，必须明确区分主人公与配角，不得交换外貌、服装或身份。
+8. 输出一句 20-40 字、不过度分析的小宠物暖心便签。
 必须只输出符合请求结构的 JSON。"""
 
     @staticmethod
@@ -49,7 +51,7 @@ class StoryboardAgent:
         # adding concrete actions, objects, or feelings. Length/excerpt checks
         # cannot prove those additions came from the user, so only the source
         # transcript is safe to persist as the diary body.
-        storyboard.organized_diary = transcript.strip()
+        storyboard.organized_diary = paragraphize_diary(transcript)
 
         source_sentences = self._sentences(transcript)
         diary_sentences = self._sentences(storyboard.organized_diary)

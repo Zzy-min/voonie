@@ -169,7 +169,7 @@ Page({
   },
 
   onNavComics() {
-    wx.switchTab({ url: "/pages/bookshelf/index" });
+    wx.navigateTo({ url: "/pages/bookshelf/index" });
   },
 
   onNavCalendar() {
@@ -177,11 +177,33 @@ Page({
   },
 
   onNavSquare() {
-    wx.navigateTo({ url: "/pages/square/index" });
+    wx.removeStorageSync("voling_square_mine_only");
+    wx.switchTab({ url: "/pages/square/index" });
   },
 
   onNavMyShares() {
-    wx.navigateTo({ url: "/pages/square/index?mine=1" });
+    wx.setStorageSync("voling_square_mine_only", true);
+    wx.switchTab({ url: "/pages/square/index" });
+  },
+
+  onNavCharacters() {
+    wx.navigateTo({ url: "/pages/characters/index" });
+  },
+
+  onNavAccountSecurity() {
+    wx.navigateTo({ url: "/pages/account-security/index" });
+  },
+
+  onNavFeedback() {
+    wx.navigateTo({ url: "/pages/feedback/index" });
+  },
+
+  onNavPrivacy() {
+    wx.navigateTo({ url: "/pages/legal/index?type=privacy" });
+  },
+
+  onNavTerms() {
+    wx.navigateTo({ url: "/pages/legal/index?type=terms" });
   },
 
   onLogout() {

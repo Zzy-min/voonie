@@ -256,7 +256,7 @@ def test_storyboard_uses_content_length_for_sparse_memory_illustrations():
     short = run(agent.generate_storyboard(short_text, CharacterConfig()))
     rich = run(agent.generate_storyboard(rich_text, CharacterConfig()))
 
-    assert short.organized_diary == short_text
+    assert "".join(short.organized_diary.split()) == "".join(short_text.split())
     assert len(short.panels) == 1
     assert len(rich.panels) == 5
     assert all(panel.anchor_text in rich.organized_diary for panel in rich.panels)

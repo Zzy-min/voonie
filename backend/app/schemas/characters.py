@@ -5,12 +5,12 @@ from pydantic import BaseModel, Field
 
 class CharacterBible(BaseModel):
     age_range: str = "young adult"
-    hair: str = "short brown hair"
-    outfit: str = "oversized yellow hoodie"
-    body: str = "small chibi proportions"
-    features: str = "round glasses"
+    hair: str = "follow the main protagonist description exactly"
+    outfit: str = "follow the main protagonist description exactly"
+    body: str = "natural human anatomy"
+    features: str = "follow the main protagonist description exactly"
     accessories: str = "none"
-    locked: list[str] = Field(default_factory=lambda: ["hairstyle", "main outfit color", "signature glasses"])
+    locked: list[str] = Field(default_factory=lambda: ["human identity", "hairstyle", "main outfit", "facial features"])
 
 
 class CharacterCreate(BaseModel):

@@ -9,7 +9,7 @@
 
   <view class="drawer-header">
     <view class="drawer-title-box">
-      <text class="title-main">Voonie</text>
+      <text class="title-main">Vonnie</text>
       <text class="title-lock">🔒</text>
       <text class="title-sub">私人聊天</text>
     </view>
@@ -25,7 +25,7 @@
     <view class="msg-item pet-msg">
       <image class="msg-avatar" src="/assets/images/voonie/voonie-avatar.png" mode="aspectFit" />
       <view class="msg-bubble pet-bubble">
-        <text>小主人，今天过得怎么样呀？想和我说说什么吗？🐾</text>
+        <text>今天过得怎么样？慢慢说，我在听。</text>
       </view>
     </view>
 
@@ -49,7 +49,7 @@
     <view wx:if="{{loading}}" class="msg-item pet-msg">
       <image class="msg-avatar" src="/assets/images/voonie/voonie-avatar.png" mode="aspectFit" />
       <view class="msg-bubble pet-bubble thinking">
-        <text>Voonie 正在思考中… ✨</text>
+        <text>Vonnie 正在想你说的话…</text>
       </view>
     </view>
   </scroll-view>

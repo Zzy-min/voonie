@@ -1,6 +1,6 @@
 // pages/pet/index.ts - 萌宠独立页（案例屏 3：快捷聊天）
 // 聊天、写日记（录音）、写下愿望
-import { chatWithPet, getPetMemories, getPetStatus, listDiaries } from "../../utils/api";
+import { chatWithPet, getPetStatus } from "../../utils/api";
 import { getNavInfo } from "../../utils/nav";
 
 interface ChatMsg {
@@ -10,6 +10,8 @@ interface ChatMsg {
 }
 
 Page({
+  keyboardHeightListener: null as null | ((res: { height: number }) => void),
+
   data: {
     statusBarHeight: 20,
     navBarHeight: 44,
@@ -17,14 +19,14 @@ Page({
     inputValue: "",
     messages: [] as ChatMsg[],
     loading: false,
-    petName: "Voonie",
-    greeting: "小主人，今天过得怎么样呀？想和我说话，或唠叨心底的愿望？🐾",
+    petName: "Vonnie",
+    greeting: "今天过得怎么样？慢慢说，我在听。",
     petStatus: "",
     petStatusLabel: "",
-    memStories: [] as string[],
-    recentDiaries: [] as Array<{ id: string; title: string; mood: string; date: string }>,
     scrollTop: 0,
     dateLabel: "",
+    keyboardHeight: 0,
+    composerStyle: "",
   },
 
   onLoad() {
@@ -36,10 +38,15 @@ Page({
       navBarHeight: nav.navBarHeight,
       navRightPadding: nav.navRightPadding,
       dateLabel: `${now.getMonth() + 1}月${now.getDate()}日 · ${weekdays[now.getDay()]}`,
+      messages: [],
     });
+    this.keyboardHeightListener = (res: { height: number }) => {
+      this.applyKeyboardHeight(res && res.height);
+    };
+    if (typeof wx.onKeyboardHeightChange === "function") {
+      wx.onKeyboardHeightChange(this.keyboardHeightListener);
+    }
     this.loadPetStatus();
-    this.loadPetMemories();
-    this.loadRecentDiaries();
   },
 
   onShow() {
@@ -51,11 +58,52 @@ Page({
     if (tab && typeof tab.setSelected === "function") {
       tab.setSelected(2);
     }
-    this.loadPetStatus();
-    // P3-3: 萌宠 Tab 常驻，跨账号切换到本页时若回忆为空则补拉一次，避免展示旧/空数据
-    if (!Array.isArray(this.data.memStories) || this.data.memStories.length === 0) {
-      this.loadPetMemories();
+    if (tab && typeof tab.setHidden === "function") {
+      tab.setHidden(false);
     }
+    this.loadPetStatus();
+  },
+
+  onHide() {
+    this.restoreTabBar();
+  },
+
+  onUnload() {
+    this.restoreTabBar();
+    if (this.keyboardHeightListener && typeof wx.offKeyboardHeightChange === "function") {
+      wx.offKeyboardHeightChange(this.keyboardHeightListener);
+    }
+    this.keyboardHeightListener = null;
+  },
+
+  restoreTabBar() {
+    const tab = typeof this.getTabBar === "function" ? this.getTabBar() : null;
+    if (tab && typeof tab.setHidden === "function") tab.setHidden(false);
+    if (this.data.keyboardHeight) this.setData({ keyboardHeight: 0, composerStyle: "" });
+  },
+
+  onKeyboardHeightChange(e: any) {
+    this.applyKeyboardHeight(e.detail && e.detail.height);
+  },
+
+  applyKeyboardHeight(rawHeight: number) {
+    const height = Math.max(0, Number(rawHeight) || 0);
+    const tab = typeof this.getTabBar === "function" ? this.getTabBar() : null;
+    if (tab && typeof tab.setHidden === "function") tab.setHidden(height > 0);
+    this.setData({
+      keyboardHeight: height,
+      composerStyle: height > 0 ? `bottom:${height}px;` : "",
+      scrollTop: height > 0 ? 999999 : this.data.scrollTop,
+    });
+  },
+
+  onInputBlur() {
+    // 部分 Android 输入法收起时不回传高度 0；失焦后强制清理旧位移。
+    setTimeout(() => {
+      const tab = typeof this.getTabBar === "function" ? this.getTabBar() : null;
+      if (tab && typeof tab.setHidden === "function") tab.setHidden(false);
+      this.setData({ keyboardHeight: 0, composerStyle: "" });
+    }, 160);
   },
 
   // 展示层：把技术态文案柔化为陪伴语气（不改业务语义）
@@ -83,7 +131,7 @@ Page({
   // 消费 /pet/status：更新问候与状态文案（失败不阻断聊天）
   async loadPetStatus() {
     try {
-      const res = await getPetStatus(this.data.petName || "Voonie");
+      const res = await getPetStatus(this.data.petName || "Vonnie");
       const status = res.status || "";
       this.setData({
         petStatus: status,
@@ -92,42 +140,6 @@ Page({
       });
     } catch (e) {
       console.warn("Load pet status failed:", e);
-    }
-  },
-
-  // 消费 /pet/memories，展示 1~3 条“记得的小事”（失败不阻断聊天）
-  async loadPetMemories() {
-    try {
-      const list = await getPetMemories();
-      const safeList = Array.isArray(list) ? list : [];
-      const rows = safeList.slice(0, 3);
-      const stories = rows
-        .map((m) => (m && (m.text || m.summary || m.content || "")) || "")
-        .filter((t: string) => Boolean(t));
-      this.setData({
-        memStories: Array.isArray(stories) ? stories : [],
-      });
-    } catch (e) {
-      console.warn("Load pet memories failed:", e);
-      this.setData({ memStories: [] });
-    }
-  },
-
-  // 最近回忆（备用于聊天上下文提示）
-  async loadRecentDiaries() {
-    try {
-      const list = await listDiaries();
-      const safeList = Array.isArray(list) ? list : [];
-      const recents = safeList.slice(0, 3).map((d) => ({
-        id: (d && d.id) || "",
-        title: (d && d.title) || "未命名日记",
-        mood: (d && d.mood) || "开心",
-        date: (d && d.date_label) || ((d && d.created_at) || "").slice(0, 10),
-      }));
-      this.setData({ recentDiaries: Array.isArray(recents) ? recents : [] });
-    } catch (e) {
-      console.warn("Load recent diaries failed:", e);
-      this.setData({ recentDiaries: [] });
     }
   },
 
@@ -153,7 +165,7 @@ Page({
 
   // 书架入口
   onOpenBookshelf() {
-    wx.switchTab({ url: "/pages/bookshelf/index" });
+    wx.navigateTo({ url: "/pages/bookshelf/index" });
   },
 
   async onSend() {
@@ -164,16 +176,21 @@ Page({
   },
 
   async sendMessage(text: string) {
+    const existingMessages = this.data.messages;
     const userMsg: ChatMsg = { id: "user-" + Date.now(), role: "user", content: text };
-    const newMsgs = [...this.data.messages, userMsg];
+    const newMsgs = [...existingMessages, userMsg];
     this.setData({ messages: newMsgs, loading: true, scrollTop: newMsgs.length * 500 });
 
     try {
-      const res = await chatWithPet(text);
+      const history = existingMessages.slice(-12).map((message) => ({
+        role: message.role === "pet" ? "assistant" : "user",
+        content: message.content,
+      }));
+      const res = await chatWithPet(text, { pet_name: this.data.petName, history });
       const petMsg: ChatMsg = {
         id: "pet-" + Date.now(),
         role: "pet",
-        content: res.reply || "汪！我一直在小主人身边哦🐾",
+        content: res.reply || "我在这里，慢慢说。",
       };
       const updated = [...this.data.messages, petMsg];
       this.setData({ messages: updated, loading: false, scrollTop: updated.length * 500 });
@@ -187,4 +204,5 @@ Page({
       this.setData({ messages: updated, loading: false, scrollTop: updated.length * 500 });
     }
   },
+
 });

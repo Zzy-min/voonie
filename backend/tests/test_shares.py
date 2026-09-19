@@ -50,7 +50,8 @@ def seed_diary(app, user_id: str) -> str:
             job = Job(id=job_id, user_id=user_id, type="comic", status="done", stage="done",
                 progress=1, request_json={}, result_json={})
             artifact = DiaryArtifact(id=artifact_id, user_id=user_id, job_id=job_id, title="晚霞散步",
-                emotion_label="开心", mood_score=80, companion_note="温暖的一天")
+                emotion_label="开心", mood_score=80, transcript_redacted="今天的日记正文",
+                companion_note="温暖的一天")
             panel = Panel(artifact_id=artifact_id, panel_no=1, storyboard_json={}, image_key="panel.png")
             db.add_all([job, artifact, panel])
             await db.commit()
@@ -72,9 +73,22 @@ def test_private_share_is_hidden_and_public_share_supports_reactions(share_clien
     published = client.post("/api/v1/shares", headers=owner_headers, json=payload | {"is_public": True})
     assert published.status_code == 201
     post = client.get("/api/v1/shares?order=latest", headers=viewer_headers).json()[0]
-    assert post["caption"] == payload["caption"]
+    assert post["artifact_id"] == diary_id
+    assert post["caption"] == "今天的日记正文"
     assert post["author"] == "小主人"
     assert post["image_url"].startswith("/api/v1/shares/")
+
+    detail = client.get(f"/api/v1/shares/{post['id']}", headers=viewer_headers)
+    assert detail.status_code == 200
+    assert detail.json()["content"] == "今天的日记正文"
+    assert detail.json()["title"] == "晚霞散步"
+    assert detail.json()["is_owner"] is False
+    forbidden_edit = client.patch(
+        f"/api/v1/diaries/{diary_id}",
+        headers=viewer_headers,
+        json={"title": "越权修改", "content": "不应成功", "expected_version": 0},
+    )
+    assert forbidden_edit.status_code == 404
 
     liked = client.put(f"/api/v1/shares/{post['id']}/reactions/like", headers=viewer_headers)
     assert liked.json() == {"active": True, "count": 1}

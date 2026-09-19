@@ -66,26 +66,39 @@
 
 .bookshelf-scroll {
   flex: 1;
-  padding: 4rpx 36rpx calc(140rpx + env(safe-area-inset-bottom));
+  width: 100%;
+  min-height: 0;
+  padding: 0;
   position: relative;
   z-index: 1;
 }
 
+.bookshelf-content {
+  width: 100%;
+  padding: 4rpx 36rpx 52rpx;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.shelf-loading { min-height: 360rpx; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20rpx; color: #7C6A5C; font-size: 25rpx; }
+.voonie-spinner { width: 52rpx; height: 52rpx; border: 5rpx solid #F8DCA8; border-top-color: #E8A74C; border-radius: 50%; animation: shelf-spin 1s linear infinite; }
+@keyframes shelf-spin { to { transform: rotate(360deg); } }
+
 .shelf-row {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 24rpx;
 }
 
 .book-item {
-  width: 216rpx;
+  width: 100%;
+  min-width: 0;
   margin-bottom: 20rpx;
 }
 
 .book-cover {
-  width: 216rpx;
-  height: 280rpx;
+  width: 100%;
+  height: 320rpx;
   border-radius: 16rpx;
   overflow: hidden;
   position: relative;

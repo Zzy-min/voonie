@@ -122,30 +122,32 @@
 
 .calendar-scroll-body {
   flex: 1;
-  padding: 10rpx 36rpx 40rpx;
+  width: 100%;
+  min-height: 0;
+  padding: 0;
   position: relative;
   z-index: 1;
 }
 
-/* 日历挂纸卡片（对齐案例第7屏挂纸与黄铜夹切片） */
-.calendar-card {
-  position: relative;
-  background-color: #FAF5ED;
-  border-radius: 36rpx;
-  box-shadow: 0 10rpx 32rpx rgba(61, 51, 42, 0.08);
-  padding: 36rpx 24rpx 30rpx;
-  margin-bottom: 36rpx;
+.calendar-content {
+  width: 100%;
+  padding: 10rpx 36rpx 48rpx;
+  box-sizing: border-box;
   overflow: hidden;
 }
 
-.calendar-paper-bg {
-  position: absolute;
-  top: 0;
-  left: 0;
+/* 日历挂纸卡片（对齐案例第7屏挂纸与黄铜夹切片） */
+.calendar-card {
   width: 100%;
-  height: 100%;
-  z-index: 0;
-  pointer-events: none;
+  box-sizing: border-box;
+  position: relative;
+  background-color: #FFFDF8;
+  border: 1rpx solid #EEE3D5;
+  border-radius: 24rpx;
+  box-shadow: 0 8rpx 40rpx rgba(84, 60, 35, 0.06);
+  padding: 36rpx 24rpx 30rpx;
+  margin-bottom: 36rpx;
+  overflow: hidden;
 }
 
 .month-selector {
@@ -251,11 +253,13 @@
 
 .diary-mark {
   position: absolute;
-  bottom: -4rpx;
+  bottom: 0;
 }
 
 .diary-dot {
-  font-size: 16rpx;
+  color: #E8A74C;
+  font-size: 28rpx;
+  line-height: 1;
 }
 
 /* 回忆列表区 */
@@ -275,12 +279,13 @@
 }
 
 .memory-cards-grid {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 24rpx;
 }
 
 .memory-mini-card {
-  flex: 1;
+  min-width: 0;
   background-color: #FFFFFF;
   border: 1rpx solid #E8DFD3;
   border-radius: 28rpx;
@@ -309,6 +314,18 @@
   color: #3D332A;
   display: block;
   margin-bottom: 10rpx;
+}
+
+.card-summary {
+  display: -webkit-box;
+  min-height: 60rpx;
+  margin-bottom: 12rpx;
+  overflow: hidden;
+  color: #7c6a5c;
+  font-size: 21rpx;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .card-meta {

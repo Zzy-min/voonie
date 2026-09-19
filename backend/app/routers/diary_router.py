@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from voonie.backend.app.api.deps import get_current_user
 from voonie.backend.app.api.deps import TEST_USER_ID
-from voonie.backend.app.db.models import Base, DiaryArtifact, DiaryEntry, Job, Panel, User
+from voonie.backend.app.db.models import Base, DiaryArtifact, DiaryEntry, DiaryReference, Job, Panel, User
 from voonie.backend.app.db.session import get_db
 from voonie.backend.app.models.schemas import (
     CharacterConfig,
@@ -46,6 +46,15 @@ def normalized_created_at(value: str | None, fallback: datetime) -> str:
     return parsed.astimezone(timezone.utc).isoformat()
 
 
+def utc_isoformat(value: datetime | None) -> str | None:
+    """Serialize SQLite datetimes as explicit UTC instead of ambiguous local time."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc).isoformat()
+
+
 def compatibility_response(job: Job, entry: DiaryEntry | None = None) -> ComicGenerationResponse:
     result = sanitize_legacy_diary_result(job.result_json or {}, job.request_json)
     user_edit = (job.result_json or {}).get("user_edit") or {}
@@ -74,9 +83,10 @@ def compatibility_response(job: Job, entry: DiaryEntry | None = None) -> ComicGe
         companion_note=result["companion_note"],
         created_at=normalized_created_at(result.get("created_at"), job.created_at),
         edit_version=int(user_edit.get("version") or 0),
-        entry_date=entry.entry_date.isoformat() if entry and entry.entry_date else None,
+        entry_date=utc_isoformat(entry.entry_date) if entry else None,
         timezone=entry.timezone if entry else None,
         updated_at=user_edit.get("updated_at") or (job.updated_at.isoformat() if job.updated_at else None),
+        reference_images=[job.request_json["reference_image"]] if job.request_json.get("reference_image") else [],
     )
 
 
@@ -258,12 +268,30 @@ async def delete_diary(
     if job is None:
         raise HTTPException(status_code=404, detail="Diary not found")
     artifact = await db.scalar(select(DiaryArtifact).where(DiaryArtifact.job_id == job.id, DiaryArtifact.user_id == current_user.id))
+    entry = None
     if artifact is not None:
+        if artifact.entry_id:
+            entry = await db.scalar(select(DiaryEntry).where(
+                DiaryEntry.id == artifact.entry_id,
+                DiaryEntry.user_id == current_user.id,
+            ))
         panels = list((await db.scalars(select(Panel).where(Panel.artifact_id == artifact.id))).all())
         for key in [artifact.composite_key, *artifact.panel_keys_json, *(panel.image_key for panel in panels)]:
             request.app.state.storage.delete(key)
         await db.delete(artifact)
     await db.delete(job)
+    # A generated diary owns its source entry in the current product model.
+    # Remove the retained recording as part of the same user action instead of
+    # leaving an inaccessible audio row/file behind.
+    if entry is not None:
+        references = list((await db.scalars(select(DiaryReference).where(
+            DiaryReference.entry_id == entry.id,
+            DiaryReference.user_id == current_user.id,
+        ))).all())
+        for reference in references:
+            request.app.state.storage.delete(reference.media_key)
+        request.app.state.storage.delete(entry.audio_key)
+        await db.delete(entry)
     await db.commit()
 
 
@@ -307,11 +335,18 @@ async def regenerate_panel(
         style_preset=snapshot.get("style_preset", "chibi_manga"),
     )
     custom_style = (body.custom_style if body and body.custom_style else None)
+    identity_panel = next(
+        (item for item in panels if item.panel_no != panel_no and item.image_key and Path(item.image_key).is_file()),
+        None,
+    )
+    identity_reference = Path(identity_panel.image_key).read_bytes() if identity_panel else None
 
     image_path, prompt = await request.app.state.image_service.generate_panel_image(
         storyboard_panel,
         character,
         custom_style,
+        ref_image=identity_reference,
+        character_bible=snapshot.get("bible"),
     )
     storyboard_panel.image_url = request.app.state.storage.get_file_url(image_path)
 

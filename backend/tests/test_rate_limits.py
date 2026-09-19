@@ -35,6 +35,8 @@ def test_comic_and_chat_hourly_limits_return_429():
     assert first_comic.status_code == 202
     assert second_comic.status_code == 429
     assert second_comic.json()["error"]["code"] == "rate_limit_exceeded"
+    assert 1 <= int(second_comic.headers["Retry-After"]) <= 3600
     assert first_chat.status_code == 200
     assert second_chat.status_code == 429
     assert second_chat.json()["error"]["code"] == "rate_limit_exceeded"
+    assert 1 <= int(second_chat.headers["Retry-After"]) <= 3600

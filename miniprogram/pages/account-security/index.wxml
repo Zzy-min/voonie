@@ -1,0 +1,61 @@
+<view class="voonie-page voonie-page--no-tab security-page">
+  <view class="security-header" style="padding-top: {{statusBarHeight}}px;">
+    <view class="header-nav" style="height: {{navBarHeight}}px; padding-right: {{navRightPadding}}px;">
+      <view class="back-btn" bindtap="onBack"><image src="/assets/icons/icon-back.svg" mode="aspectFit" /></view>
+      <text class="header-title">账号与安全</text>
+    </view>
+  </view>
+
+  <view class="loading" wx:if="{{loading}}">正在读取账号信息…</view>
+  <view class="error-state" wx:elif="{{failed}}">
+    <text>账号信息暂时没有加载出来</text>
+    <button class="retry-btn" bindtap="onRetry">重新加载</button>
+  </view>
+  <scroll-view class="security-scroll" scroll-y wx:else>
+    <view class="intro-card">
+      <text class="intro-title">{{required ? '请先完成微信认证' : '微信认证优先'}}</text>
+      <text class="intro-copy">微信是 Voling 日记的主身份。绑定后，邮箱或手机号只作为同一账号的辅助登录方式，日记、绘本与回忆不会重复创建。</text>
+    </view>
+
+    <view class="identity-list">
+      <view class="identity-row">
+        <view class="identity-icon email-icon">邮</view>
+        <view class="identity-copy">
+          <text class="identity-name">邮箱账号</text>
+          <text class="identity-value">{{identities.email_bound ? identities.email_masked : '未绑定'}}</text>
+        </view>
+        <text class="bound-tag" wx:if="{{identities.email_bound}}">已绑定</text>
+      </view>
+
+      <view class="identity-row">
+        <view class="identity-icon wechat-icon">微</view>
+        <view class="identity-copy">
+          <text class="identity-name">微信</text>
+          <text class="identity-value">{{identities.wechat_bound ? '可使用微信快捷登录' : '绑定到当前账号'}}</text>
+        </view>
+        <button class="bind-btn bound" wx:if="{{identities.wechat_bound}}" disabled>已绑定</button>
+        <button class="bind-btn" wx:else loading="{{action === 'wechat'}}" disabled="{{action !== ''}}" bindtap="onBindWeChat">绑定</button>
+      </view>
+
+      <view class="identity-row">
+        <view class="identity-icon phone-icon">手机</view>
+        <view class="identity-copy">
+          <text class="identity-name">手机号</text>
+          <text class="identity-value">{{identities.phone_bound ? identities.phone_masked : '由微信安全授权'}}</text>
+        </view>
+        <button class="bind-btn bound" wx:if="{{identities.phone_bound}}" disabled>已绑定</button>
+        <button class="bind-btn" wx:else open-type="{{identities.wechat_bound ? 'getPhoneNumber' : ''}}" loading="{{action === 'phone'}}" disabled="{{action !== '' || !identities.wechat_bound}}" bindgetphonenumber="onBindPhone">{{identities.wechat_bound ? '绑定' : '先绑微信'}}</button>
+      </view>
+    </view>
+
+    <view class="notice-card">
+      <text class="notice-title">绑定不会复制数据</text>
+      <text class="notice-copy">新的登录方式会直接关联当前账号。若微信或手机号已经属于其他账号，系统会停止绑定，不会覆盖任何日记。</text>
+    </view>
+    <view class="danger-zone">
+      <text class="danger-title">数据与账号</text>
+      <text class="danger-copy">注销会永久删除服务端的日记、图片、录音、AI 生成记录和账号设置。</text>
+      <button class="delete-account-btn" loading="{{action === 'delete'}}" disabled="{{action !== ''}}" bindtap="onDeleteAccount">清空全部数据并注销账号</button>
+    </view>
+  </scroll-view>
+</view>

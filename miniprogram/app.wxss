@@ -5,47 +5,59 @@
 
 page {
   /* 基础与背景色彩 */
-  --bg-primary: #FAF7F0;        /* 柔和暖米白底色 */
-  --bg-secondary: #F5EFE6;      /* 温暖居室底色 */
-  --bg-surface: #FFFCF8;        /* 暖白（避免刺眼纯白） */
-  --bg-surface-soft: #F6F0E6;   /* 浅杏容器 */
-  --bg-paper: #FCFAF6;         /* 手帐厚宣纸质感 */
-  --bg-paper-dark: #F3ECE1;    /* 封皮与侧栏深纸色 */
+  --bg-primary: #FFF9F1;
+  --bg-secondary: #FBF2E7;
+  --bg-surface: #FFFDF8;
+  --bg-surface-soft: #F8F1E8;
+  --bg-paper: #FFFDF8;
+  --bg-paper-dark: #F4EBDD;
 
   /* 品牌色彩 */
-  --primary: #D9845B;           /* 暖焦糖 / 日落橙 */
-  --primary-hover: #C87444;     /* 加深色 */
-  --primary-pressed: #B86234;   /* 按压色 */
-  --primary-light: #FDF3EB;     /* 浅色高亮 */
+  --primary: #E8A74C;
+  --primary-hover: #D9983C;
+  --primary-pressed: #C7842F;
+  --primary-light: #F8DCA8;
   --accent-fur: #E4A968;        /* 小狗毛色金黄 */
   --accent-scarf: #C26741;      /* 小狗领巾暖红 */
   --accent-heart: #E07A5F;      /* 情绪红心 */
   --accent-green: #819875;      /* 治愈草木绿 */
 
   /* 文字色彩 */
-  --text-primary: #3D332A;      /* 深暖炭褐 */
-  --text-secondary: #7A6F64;    /* 中度暖灰 */
-  --text-muted: #ABA094;        /* 浅咖辅助字 */
-  --text-inverse: #FFFFFF;
+  --text-primary: #3E3026;
+  --text-secondary: #7C6A5C;
+  --text-muted: #A89789;
+  --text-inverse: #FFFDF8;
 
   /* 边框与阴影 */
-  --border-soft: #E8DFD3;       /* 细浅米咖线 */
-  --border-light: #F0E9DF;
-  --shadow-soft: 0 6rpx 24rpx rgba(118, 93, 70, 0.055);
-  --shadow-float: 0 10rpx 36rpx rgba(61, 51, 42, 0.08);
-  --shadow-book: 0 12rpx 36rpx rgba(78, 62, 48, 0.10);
+  --border-soft: #EEE3D5;
+  --border-light: #F4ECE2;
+  --shadow-soft: 0 8rpx 40rpx rgba(84, 60, 35, 0.06);
+  --shadow-float: 0 8rpx 40rpx rgba(84, 60, 35, 0.06);
+  --shadow-book: 0 8rpx 40rpx rgba(84, 60, 35, 0.06);
 
   /* 圆角规范 */
   --radius-xs: 8rpx;
   --radius-sm: 16rpx;
   --radius-md: 24rpx;
-  --radius-lg: 40rpx;
+  --radius-lg: 32rpx;
   --radius-xl: 48rpx;
   --radius-pill: 9999rpx;
+  --space-1: 8rpx;
+  --space-2: 16rpx;
+  --space-3: 24rpx;
+  --space-4: 32rpx;
+  --space-5: 40rpx;
+  --space-6: 48rpx;
+  --space-8: 64rpx;
+  --page-padding: 40rpx;
+  --success: #82A96B;
+  --mood-blue: #AFCBD2;
+  --mood-pink: #E6B7B0;
+  --mood-purple: #C7B8DB;
 
   background-color: var(--bg-primary);
   color: var(--text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  font-family: "PingFang SC", system-ui, -apple-system, BlinkMacSystemFont, "Microsoft YaHei", sans-serif;
   font-size: 28rpx;
   line-height: 1.5;
   box-sizing: border-box;
@@ -91,8 +103,8 @@ button::after {
   height: 96rpx;
   line-height: 96rpx;
   text-align: center;
-  box-shadow: 0 8rpx 24rpx rgba(217, 132, 91, 0.22);
-  transition: all 0.2s ease;
+  box-shadow: none;
+  transition: transform 120ms ease, background-color 120ms ease;
   display: flex;
   align-items: center;
   justify-content: center;

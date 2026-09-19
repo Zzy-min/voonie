@@ -103,6 +103,46 @@ def test_text_entry_crud_idempotency_and_user_isolation(entries_client):
     assert client.get(f"/api/v1/entries/{entry_id}", headers=owner).status_code == 404
 
 
+def test_text_entry_security_boundaries_and_repeated_click_idempotency(entries_client):
+    client, _ = entries_client
+    owner = auth_headers(client, "entry-security-owner")
+    other = auth_headers(client, "entry-security-other")
+    local_id = "security-idempotency"
+    payload = {
+        "local_id": local_id,
+        "text": "' OR 1=1; -- <script>alert('xss')</script> 中文与 emoji 🔒",
+        "entry_date": "2026-09-19T10:00:00+08:00",
+        "timezone": "Asia/Shanghai",
+    }
+    responses = [
+        client.post(
+            "/api/v1/entries/text",
+            headers=owner | {"Idempotency-Key": local_id},
+            json=payload,
+        )
+        for _ in range(10)
+    ]
+    assert responses[0].status_code == 201
+    assert all(response.status_code in {200, 201} for response in responses[1:])
+    assert len({response.json()["id"] for response in responses}) == 1
+    entry_id = responses[0].json()["id"]
+    assert responses[0].json()["redacted_text"] == payload["text"]
+    assert client.get(f"/api/v1/entries/{entry_id}", headers=other).status_code == 404
+
+    malformed = client.post(
+        "/api/v1/entries/text",
+        headers=owner | {"Content-Type": "application/json"},
+        content=b'{"local_id":',
+    )
+    oversized = client.post(
+        "/api/v1/entries/text",
+        headers=owner,
+        json=payload | {"local_id": "oversized", "text": "x" * 20001},
+    )
+    assert malformed.status_code == 422
+    assert oversized.status_code == 422
+
+
 def test_date_filter_uses_requested_timezone(entries_client):
     client, _ = entries_client
     auth = auth_headers(client, "entry-timezone")

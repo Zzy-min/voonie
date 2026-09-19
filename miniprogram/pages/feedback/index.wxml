@@ -1,0 +1,12 @@
+<view class="voonie-page voonie-page--no-tab feedback-page">
+  <view class="page-header" style="padding-top: {{statusBarHeight}}px;"><view class="header-nav" style="height: {{navBarHeight}}px; padding-right: {{navRightPadding}}px;"><view class="back-btn" bindtap="onBack"><image src="/assets/icons/icon-back.svg" mode="aspectFit" /></view><text class="header-title">反馈与建议</text></view></view>
+  <scroll-view class="feedback-scroll" scroll-y>
+    <text class="lead">哪里不顺手，告诉我们就好。不会自动上传你的日记正文。</text>
+    <view class="field"><text class="label">反馈类型</text><picker mode="selector" range="{{types}}" range-key="0" value="{{typeIndex}}" bindchange="onTypeChange"><view class="picker-value">{{types[typeIndex][0]}} <text>›</text></view></picker></view>
+    <view class="field"><text class="label">问题描述</text><textarea class="description" value="{{description}}" maxlength="4000" placeholder="发生了什么？你原本希望怎样？" bindinput="onDescriptionInput" /><text class="count">{{description.length}} / 4000</text></view>
+    <view class="field"><text class="label">截图（可选）</text><view class="screenshot-box" wx:if="{{screenshotPath}}"><image src="{{screenshotPath}}" mode="aspectFill" /><text bindtap="onRemoveScreenshot">移除</text></view><view class="choose-image" wx:else bindtap="onChooseScreenshot">＋ 从相册选择或拍照</view></view>
+    <view class="field"><text class="label">联系方式（可选）</text><input class="contact" value="{{contact}}" placeholder="邮箱或手机号" bindinput="onContactInput" /></view>
+    <view class="privacy-row" bindtap="onToggleContext"><view class="check {{includeRelatedContent ? 'on' : ''}}">{{includeRelatedContent ? '✓' : ''}}</view><text>提交当前错误标识帮助排查（不包含日记正文）</text></view>
+    <button class="submit" loading="{{submitting}}" disabled="{{submitting}}" bindtap="onSubmit">提交反馈</button>
+  </scroll-view>
+</view>

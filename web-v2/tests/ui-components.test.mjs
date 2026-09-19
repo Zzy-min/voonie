@@ -85,6 +85,17 @@ test("illustrated diary keeps one reading flow and anchors images to diary text"
   assert.match(api, /emotion_curve/);
 });
 
+test("web diary can regenerate one illustration without replacing the whole diary", async () => {
+  const source = await readFile(path.join(root, "app", "page.tsx"), "utf8");
+  const api = await readFile(path.join(root, "lib", "api.ts"), "utf8");
+
+  assert.match(source, /handleRegeneratePanel/);
+  assert.match(source, /重绘此幕/);
+  assert.match(source, /regeneratingPanel === item\.index/);
+  assert.match(api, /\/diaries\/\$\{jobId\}\/panels\/\$\{panelNo\}\/regenerate/);
+  assert.match(api, /custom_prompt/);
+});
+
 test("uses the cleaned Voonie v2 identity assets without repeating sprite cells", async () => {
   const source = await readFile(path.join(root, "app", "page.tsx"), "utf8");
 

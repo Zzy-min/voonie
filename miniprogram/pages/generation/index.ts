@@ -1,6 +1,7 @@
 // pages/generation/index.ts
-import { diaryDraftKey, waitForJob, listDiaries, getDiaryDetail, retryJob, JobCanceledError } from "../../utils/api";
+import { cancelJob, diaryDraftKey, waitForJob, listDiaries, getDiaryDetail, retryJob, JobCanceledError } from "../../utils/api";
 import { getNavInfo } from "../../utils/nav";
+import { readDiaryDraft, removeDiaryDraft, writeDiaryDraft } from "../../utils/draftStorage";
 
 Page({
   data: {
@@ -13,16 +14,20 @@ Page({
     percent: 0,
     failed: false,
     errorMsg: "",
+    draftText: "",
+    canceling: false,
   },
 
   onLoad(options: Record<string, string | undefined>) {
     const nav = getNavInfo();
+    const draft = readDiaryDraft(diaryDraftKey());
     this.setData({
       statusBarHeight: nav.statusBarHeight,
       navBarHeight: nav.navBarHeight,
       navRightPadding: nav.navRightPadding,
       jobId: options.jobId || "",
       entryId: options.entryId || "",
+      draftText: draft.text || "",
     });
 
     if (!this.data.jobId) {
@@ -139,12 +144,32 @@ Page({
   onBack() {
     wx.reLaunch({ url: "/pages/index/index" });
   },
+
+  async onEditDraft() {
+    if (this.data.canceling) return;
+    this.setData({ canceling: true });
+    try {
+      if (this.data.jobId) await cancelJob(this.data.jobId);
+      const draft = readDiaryDraft(diaryDraftKey());
+      writeDiaryDraft(diaryDraftKey(), Object.assign({}, draft, {
+        text: this.data.draftText || draft.text || "",
+        status: "text-draft",
+        jobId: "",
+        updatedAt: Date.now(),
+      }));
+      this._pollGen++;
+      wx.navigateBack({ fail: () => wx.redirectTo({ url: "/pages/record/index" }) });
+    } catch (error: any) {
+      this.setData({ canceling: false });
+      wx.showToast({ title: error?.message || "暂时无法返回编辑", icon: "none" });
+    }
+  },
 });
 
 // 仅在生成完成后清理本地草稿；失败态必须保留，以便恢复。
 function findAndDeleteDraft(page: any) {
   try {
-    wx.removeStorageSync(diaryDraftKey());
+    removeDiaryDraft(diaryDraftKey());
   } catch (e) {
     /* ignore */
   }

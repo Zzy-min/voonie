@@ -1,19 +1,23 @@
 import uuid
 import asyncio
+import base64
 import hashlib
 import json
+from io import BytesIO
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, Depends, File, Form, Header, Query, Request, UploadFile, status
+from PIL import Image
 from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from voonie.backend.app.api.deps import get_current_user
 from voonie.backend.app.core.exceptions import ApiError
-from voonie.backend.app.db.models import DiaryArtifact, DiaryEntry, Job, User
+from voonie.backend.app.db.models import Character, DiaryArtifact, DiaryEntry, DiaryReference, Job, Panel, User
 from voonie.backend.app.db.session import get_db
 from voonie.backend.app.schemas.entries import EntryListResponse, EntryResponse, EntryUpdate, TextEntryCreate
 from voonie.backend.app.api.routers.jobs import enqueue_comic_job
@@ -27,6 +31,10 @@ from voonie.backend.app.services.audio_duration import (
 )
 
 router = APIRouter(prefix="/entries", tags=["Entries"])
+
+REFERENCE_TYPES = {"subject", "style", "scene", "tone", "combined"}
+MAX_REFERENCE_BYTES = 5 * 1024 * 1024
+MAX_REFERENCE_PIXELS = 24_000_000
 
 
 def source_fingerprint(input_type: str, content_hash: str, entry_date: datetime, timezone_name: str) -> str:
@@ -333,10 +341,93 @@ async def update_entry(
 
 
 @router.delete("/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_entry(entry_id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def delete_entry(
+    entry_id: str,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     entry = await owned_entry(db, entry_id, current_user.id)
+    references = list((await db.scalars(select(DiaryReference).where(
+        DiaryReference.entry_id == entry.id,
+        DiaryReference.user_id == current_user.id,
+    ))).all())
+    for reference in references:
+        request.app.state.storage.delete(reference.media_key)
+    artifacts = list((await db.scalars(select(DiaryArtifact).where(
+        DiaryArtifact.entry_id == entry.id,
+        DiaryArtifact.user_id == current_user.id,
+    ))).all())
+    for artifact in artifacts:
+        panels = list((await db.scalars(select(Panel).where(Panel.artifact_id == artifact.id))).all())
+        for key in [artifact.composite_key, *artifact.panel_keys_json, *(panel.image_key for panel in panels)]:
+            request.app.state.storage.delete(key)
+        job = await db.get(Job, artifact.job_id)
+        await db.delete(artifact)
+        if job is not None and job.user_id == current_user.id:
+            await db.delete(job)
+    request.app.state.storage.delete(entry.audio_key)
     await db.delete(entry)
     await db.commit()
+
+
+@router.post("/{entry_id}/references", status_code=status.HTTP_201_CREATED)
+async def upload_diary_reference(
+    entry_id: str,
+    request: Request,
+    reference_type: str = Form("combined"),
+    include_in_content: bool = Form(False),
+    paragraph_anchor: str | None = Form(None),
+    image_file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    entry = await owned_entry(db, entry_id, current_user.id)
+    if reference_type not in REFERENCE_TYPES:
+        raise ApiError(422, "invalid_reference_type", "Unsupported diary reference type")
+    chunks: list[bytes] = []
+    size = 0
+    while chunk := await image_file.read(1024 * 1024):
+        size += len(chunk)
+        if size > MAX_REFERENCE_BYTES:
+            raise ApiError(413, "image_too_large", "Reference image exceeds 5MB")
+        chunks.append(chunk)
+    payload = b"".join(chunks)
+    if not payload:
+        raise ApiError(400, "empty_image", "Reference image is empty")
+    try:
+        with Image.open(BytesIO(payload)) as image:
+            width, height = image.size
+            if width <= 0 or height <= 0 or width * height > MAX_REFERENCE_PIXELS:
+                raise ApiError(413, "image_dimensions_too_large", "Reference image dimensions exceed the limit")
+            image.verify()
+    except ApiError:
+        raise
+    except Exception as exc:
+        raise ApiError(415, "invalid_image", "Reference image is not valid") from exc
+    saved = request.app.state.storage.save_bytes(payload, suffix=".png")
+    reference = DiaryReference(
+        user_id=current_user.id,
+        entry_id=entry.id,
+        media_key=str(saved),
+        reference_type=reference_type,
+        paragraph_anchor=(paragraph_anchor or "").strip()[:500] or None,
+        include_in_content=include_in_content,
+        width=width,
+        height=height,
+    )
+    db.add(reference)
+    await db.commit()
+    await db.refresh(reference)
+    return {
+        "id": reference.id,
+        "reference_type": reference.reference_type,
+        "include_in_content": reference.include_in_content,
+        "paragraph_anchor": reference.paragraph_anchor,
+        "image_url": request.app.state.storage.get_file_url(reference.media_key),
+        "width": reference.width,
+        "height": reference.height,
+    }
 
 
 @router.post("/{entry_id}/comic-jobs", response_model=JobQueuedResponse, status_code=status.HTTP_202_ACCEPTED)
@@ -352,14 +443,77 @@ async def create_entry_comic_job(
     if not entry.redacted_text:
         raise ApiError(409, "entry_not_ready", "Diary entry has no confirmed text yet")
     character = body.character if body else CharacterConfig()
+    character_bible = None
+    character_seed = None
+    reference_b64 = body.ref_image_b64 if body else None
+    diary_reference = None
+    if body and body.reference_id:
+        diary_reference = await db.scalar(select(DiaryReference).where(
+            DiaryReference.id == body.reference_id,
+            DiaryReference.entry_id == entry.id,
+            DiaryReference.user_id == current_user.id,
+        ))
+        if diary_reference is None:
+            raise ApiError(404, "diary_reference_not_found", "Diary reference not found")
+        reference_path = Path(diary_reference.media_key)
+        if not reference_path.is_file():
+            raise ApiError(410, "diary_reference_missing", "Diary reference file is missing")
+        reference_b64 = base64.b64encode(reference_path.read_bytes()).decode("ascii")
+    if body and body.character_id:
+        saved_character = await db.scalar(
+            select(Character)
+            .options(selectinload(Character.references))
+            .where(Character.id == body.character_id, Character.user_id == current_user.id)
+        )
+        if saved_character is None:
+            raise ApiError(404, "character_not_found", "Character not found")
+        character = CharacterConfig(
+            character_name=saved_character.name,
+            appearance_prompt=saved_character.appearance_prompt,
+            style_preset=saved_character.style_preset,
+        )
+        character_bible = saved_character.bible_json
+        character_seed = saved_character.seed
+        # 早期版本为所有自定义角色写入了默认女孩设定，导致男生或其他形象
+        # 与“棕色短发、黄色卫衣、圆眼镜”冲突。只兼容清理这组旧默认值，
+        # 用户显式维护过的角色 bible 仍完整保留。
+        if (
+            character_bible.get("hair") == "short brown hair"
+            and character_bible.get("outfit") == "oversized yellow hoodie"
+            and character_bible.get("features") == "round glasses"
+        ):
+            character_bible = {
+                "age_range": "young adult",
+                "hair": "follow the main protagonist description exactly",
+                "outfit": "follow the main protagonist description exactly",
+                "body": "natural human anatomy",
+                "features": "follow the main protagonist description exactly",
+                "accessories": "follow the main protagonist description exactly",
+                "locked": ["human identity", "hairstyle", "main outfit", "facial features"],
+            }
+        approved_reference = next(
+            (item for item in saved_character.references if item.moderation_status == "approved"),
+            None,
+        )
+        if approved_reference and Path(approved_reference.media_key).is_file():
+            reference_b64 = base64.b64encode(Path(approved_reference.media_key).read_bytes()).decode("ascii")
     payload = {
         "text": entry.redacted_text,
         "character": character.model_dump(mode="json"),
+        "character_bible": character_bible,
+        "character_seed": character_seed,
         "custom_style": body.custom_style if body else None,
-        "ref_image_b64": body.ref_image_b64 if body else None,
+        "ref_image_b64": reference_b64,
         "local_id": entry.local_id,
         "timezone": entry.timezone,
         "input_type": entry.input_type,
         "entry_id": entry.id,
+        "reference_image": ({
+            "id": diary_reference.id,
+            "image_url": request.app.state.storage.get_file_url(diary_reference.media_key),
+            "reference_type": diary_reference.reference_type,
+            "include_in_content": diary_reference.include_in_content,
+            "paragraph_anchor": diary_reference.paragraph_anchor,
+        } if diary_reference else None),
     }
     return await enqueue_comic_job(request, db, current_user, payload, idempotency_key)

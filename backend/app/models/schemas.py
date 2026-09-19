@@ -83,6 +83,7 @@ class ComicGenerationResponse(BaseModel):
     entry_date: Optional[str] = None
     timezone: Optional[str] = None
     updated_at: Optional[str] = None
+    reference_images: list[dict] = Field(default_factory=list)
 
 class DiaryEditRequest(BaseModel):
     title: str = Field(min_length=1, max_length=80)

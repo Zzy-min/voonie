@@ -29,6 +29,17 @@ def test_health_reports_application_and_database_status():
     }
 
 
+def test_access_trace_headers_are_returned_and_preserved():
+    with TestClient(create_app(make_settings())) as client:
+        response = client.get(
+            "/health",
+            headers={"X-Request-ID": "request-123", "X-Trace-ID": "trace-456"},
+        )
+
+    assert response.headers["X-Request-ID"] == "request-123"
+    assert response.headers["X-Trace-ID"] == "trace-456"
+
+
 def test_ready_skips_redis_in_inline_mode():
     with TestClient(create_app(make_settings())) as client:
         response = client.get("/health/ready")

@@ -5,7 +5,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from voonie.backend.app.api.deps import get_current_user
-from voonie.backend.app.db.models import Character, DailyDiary, DiaryArtifact, DiaryEntry, Job, MemoryItem, Panel, PetSession, RateLimitCounter, RefreshToken, User
+from voonie.backend.app.db.models import Character, CharacterReference, DailyDiary, DiaryArtifact, DiaryEntry, DiaryReference, Job, MemoryItem, Panel, PetSession, RateLimitCounter, RefreshToken, User
 from voonie.backend.app.db.session import get_db
 from voonie.backend.app.schemas.me import PreferencesResponse, PreferencesUpdate
 
@@ -91,11 +91,21 @@ async def delete_data(
     artifact_ids = [artifact.id for artifact in artifacts]
     panels = list((await db.scalars(select(Panel).where(Panel.artifact_id.in_(artifact_ids)))).all()) if artifact_ids else []
     entries = list((await db.scalars(select(DiaryEntry).where(DiaryEntry.user_id == user_id))).all())
+    character_references = list((await db.scalars(
+        select(CharacterReference)
+        .join(Character, Character.id == CharacterReference.character_id)
+        .where(Character.user_id == user_id)
+    )).all())
+    diary_references = list((await db.scalars(select(DiaryReference).where(
+        DiaryReference.user_id == user_id
+    ))).all())
     for key in [
         *(artifact.composite_key for artifact in artifacts),
         *(key for artifact in artifacts for key in artifact.panel_keys_json),
         *(panel.image_key for panel in panels),
         *(entry.audio_key for entry in entries),
+        *(reference.media_key for reference in character_references),
+        *(reference.media_key for reference in diary_references),
     ]:
         request.app.state.storage.delete(key)
     await db.execute(delete(PetSession).where(PetSession.user_id == user_id))

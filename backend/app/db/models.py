@@ -25,6 +25,7 @@ class User(TimestampMixin, Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
     email: Mapped[str | None] = mapped_column(String(255), unique=True, index=True, nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(32), unique=True, index=True, nullable=True)
     wechat_openid: Mapped[str | None] = mapped_column(String(128), unique=True, index=True, nullable=True)
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     device_id: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
@@ -135,6 +136,20 @@ class DiaryEntry(TimestampMixin, Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
+
+class DiaryReference(TimestampMixin, Base):
+    __tablename__ = "diary_references"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    entry_id: Mapped[str] = mapped_column(ForeignKey("diary_entries.id", ondelete="CASCADE"), nullable=False, index=True)
+    media_key: Mapped[str] = mapped_column(String(512), nullable=False)
+    reference_type: Mapped[str] = mapped_column(String(24), default="combined", nullable=False)
+    paragraph_anchor: Mapped[str | None] = mapped_column(String(500))
+    include_in_content: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", nullable=False)
+    width: Mapped[int] = mapped_column(Integer, nullable=False)
+    height: Mapped[int] = mapped_column(Integer, nullable=False)
 
 
 class DailyDiary(TimestampMixin, Base):
@@ -289,4 +304,19 @@ class ShareReport(TimestampMixin, Base):
     post_id: Mapped[str] = mapped_column(ForeignKey("share_posts.id", ondelete="CASCADE"), nullable=False, index=True)
     reason: Mapped[str] = mapped_column(String(64), nullable=False)
     detail: Mapped[str | None] = mapped_column(String(500))
+    status: Mapped[str] = mapped_column(String(16), default="submitted", server_default="submitted", nullable=False)
+
+
+class Feedback(TimestampMixin, Base):
+    __tablename__ = "feedback"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    category: Mapped[str] = mapped_column(String(32), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    contact: Mapped[str | None] = mapped_column(String(255))
+    device_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
+    diagnostics_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
+    attachment_key: Mapped[str | None] = mapped_column(String(512))
+    include_related_content: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0", nullable=False)
     status: Mapped[str] = mapped_column(String(16), default="submitted", server_default="submitted", nullable=False)

@@ -2,13 +2,16 @@
 import { recorderInstance } from "../../utils/recorder";
 import {
   uploadVoiceFile,
+  createTextEntry,
   createComicJob,
+  uploadDiaryReference,
   diaryDraftKey,
   ensureIdempotencyKey,
   localTimezone,
   nowIsoDate,
 } from "../../utils/api";
 import { getNavInfo } from "../../utils/nav";
+import { readDiaryDraft, writeDiaryDraft } from "../../utils/draftStorage";
 
 const INSPIRATIONS = [
   "今天发生了一些让我高兴的事……",
@@ -32,6 +35,17 @@ Page({
     draftLocalId: "",
     isUploading: false,
     uploadFailed: false,
+    draftText: "",
+    transcribedEntryId: "",
+    textSubmitting: false,
+    draftStorageFailed: false,
+    referencePath: "",
+    referenceType: "combined" as "subject" | "style" | "scene" | "tone" | "combined",
+    referenceTypeLabel: "综合参考",
+    referenceId: "",
+    referenceEntryId: "",
+    referenceIncludeInContent: true,
+    targetEntryDate: "",
     waveAmps: [18, 30, 22, 40, 26, 34, 20],
   },
 
@@ -43,10 +57,13 @@ Page({
   onLoad() {
     this.pageActive = true;
     const nav = getNavInfo();
+    const targetEntryDate = wx.getStorageSync("voling_record_date") || "";
+    wx.removeStorageSync("voling_record_date");
     this.setData({
       statusBarHeight: nav.statusBarHeight,
       navBarHeight: nav.navBarHeight,
       navRightPadding: nav.navRightPadding,
+      targetEntryDate,
     });
 
     this.setupRecorder();
@@ -245,6 +262,93 @@ Page({
     });
   },
 
+  onDraftTextInput(e: WechatMiniprogram.Input) {
+    const draftText = e.detail.value;
+    this.setData({ draftText });
+    const key = diaryDraftKey();
+    const current = readDiaryDraft(key);
+    const saved = writeDiaryDraft(key, Object.assign({}, current, {
+      text: draftText,
+      status: "text-draft",
+      updatedAt: Date.now(),
+    }));
+    if (!saved && !this.data.draftStorageFailed) {
+      this.setData({ draftStorageFailed: true });
+      wx.showToast({ title: "草稿保存失败，请勿退出并检查存储空间", icon: "none" });
+    } else if (saved && this.data.draftStorageFailed) {
+      this.setData({ draftStorageFailed: false });
+    }
+  },
+
+  async onSubmitText() {
+    const text = (this.data.draftText || "").trim();
+    if (text.length < 2 || this.data.textSubmitting || this.data.isUploading) {
+      wx.showToast({ title: text ? "再多写一点吧" : "先说或写下今天发生的事", icon: "none" });
+      return;
+    }
+    this.setData({ textSubmitting: true });
+    try {
+      const savedDraft = readDiaryDraft(diaryDraftKey());
+      const localId = savedDraft.localId || ensureIdempotencyKey();
+      let entryId = this.data.transcribedEntryId;
+      if (!entryId || text !== (savedDraft.text || "").trim()) {
+        const metadata = this.getEntryMetadata();
+        const entry = await createTextEntry(text, metadata.entryDate, metadata.timezone, localId);
+        entryId = entry.id;
+      }
+      let referenceId = this.data.referenceEntryId === entryId ? this.data.referenceId : "";
+      if (this.data.referencePath && !referenceId) {
+        const paragraphAnchor = this.referenceParagraphAnchor(text);
+        const uploaded = await uploadDiaryReference(entryId, this.data.referencePath, {
+          type: this.data.referenceType,
+          includeInContent: this.data.referenceIncludeInContent,
+          paragraphAnchor,
+        });
+        referenceId = uploaded.id;
+        this.setData({ referenceId, referenceEntryId: entryId });
+      }
+      const reference = referenceId
+        ? { id: referenceId, type: this.data.referenceType }
+        : undefined;
+      const job = await createComicJob(entryId, `${localId}-comic`, undefined, reference);
+      const currentDraft = readDiaryDraft(diaryDraftKey());
+      writeDiaryDraft(diaryDraftKey(), Object.assign({}, currentDraft, {
+        entryId,
+        text,
+        localId,
+        jobId: job.job_id,
+        referenceId,
+        referenceEntryId: referenceId ? entryId : "",
+        referencePath: this.data.referencePath,
+        referenceType: this.data.referenceType,
+        referenceIncludeInContent: this.data.referenceIncludeInContent,
+        status: "generating",
+        updatedAt: Date.now(),
+      }));
+      this.setData({ textSubmitting: false });
+      wx.navigateTo({ url: `/pages/generation/index?jobId=${job.job_id}&entryId=${entryId}` });
+    } catch (err: any) {
+      this.setData({ textSubmitting: false });
+      wx.showToast({ title: err?.message || "整理失败，请重试", icon: "none" });
+    }
+  },
+
+  onVoiceTouchStart() {
+    if (this.data.isUploading || this.data.textSubmitting || this.data.isRecording || this.data.isStarting) return;
+    this.startRecording();
+  },
+
+  onVoiceTouchEnd() {
+    if (!this.data.isRecording) return;
+    if (recorderInstance.getDuration() < 1) {
+      this.discardNextStop = true;
+      recorderInstance.stop();
+      wx.showToast({ title: "按住久一点再说", icon: "none" });
+      return;
+    }
+    recorderInstance.stop();
+  },
+
   onTogglePause() {
     if (!this.data.isRecording) return;
     if (this.data.isPaused) {
@@ -273,11 +377,14 @@ Page({
   },
 
   onPrimaryRecordTap() {
-    if (this.data.isUploading) return;
+    if (this.data.isUploading || this.data.textSubmitting) return;
     if (!this.data.isRecording) {
       this.startRecording();
-      return;
     }
+  },
+
+  onFinishRecord() {
+    if (!this.data.isRecording || this.data.isUploading) return;
     if (recorderInstance.getDuration() < 2) {
       wx.showToast({
         title: "说得太短啦，再多和 Voonie 聊聊吧🐾",
@@ -291,10 +398,9 @@ Page({
   async handleRecordFinished(filePath: string, localId: string) {
     if (this.data.isUploading) return;
     this.setData({ isUploading: true, uploadFailed: false });
-    wx.showLoading({ title: "正在上传倾听……", mask: true });
 
     try {
-      const savedDraft = wx.getStorageSync(diaryDraftKey()) || {};
+      const savedDraft = readDiaryDraft(diaryDraftKey());
       const uploadMetadata = {
         entryDate: savedDraft.entryDate || nowIsoDate(),
         timezone: savedDraft.timezone || localTimezone(),
@@ -302,7 +408,7 @@ Page({
       // Older retained drafts did not store these fields. Persist the chosen
       // fallback before uploading so every later retry keeps the same source
       // fingerprint even if this attempt times out.
-      wx.setStorageSync(diaryDraftKey(), Object.assign({}, savedDraft, {
+      writeDiaryDraft(diaryDraftKey(), Object.assign({}, savedDraft, {
         audioPath: filePath,
         localId,
         entryDate: uploadMetadata.entryDate,
@@ -310,13 +416,11 @@ Page({
       }));
       // 1. 上传音频并转写（POST /entries/voice）
       const transcribeRes = await uploadVoiceFile(filePath, localId, uploadMetadata);
-      wx.hideLoading();
-
       const entryId = transcribeRes.entry_id;
-      const transcript = transcribeRes.transcript;
+      const transcript = transcribeRes.transcript || "";
 
-      // 暂存 Draft
-      wx.setStorageSync(diaryDraftKey(), {
+      const completedDraft = readDiaryDraft(diaryDraftKey());
+      writeDiaryDraft(diaryDraftKey(), Object.assign({}, completedDraft, {
         entryId,
         text: transcript,
         audioPath: filePath,
@@ -325,32 +429,18 @@ Page({
         timezone: uploadMetadata.timezone,
         status: "transcribed",
         updatedAt: Date.now(),
+      }));
+      this.setData({
+        isUploading: false,
+        draftText: transcript,
+        transcribedEntryId: entryId,
+        uploadFailed: false,
       });
-
-      // 2. 发起图文日记生成任务（POST /entries/{id}/comic-jobs）
-      const jobRes = await createComicJob(entryId, `${localId}-comic`);
-      wx.setStorageSync(diaryDraftKey(), {
-        entryId,
-        text: transcript,
-        audioPath: filePath,
-        localId,
-        entryDate: uploadMetadata.entryDate,
-        timezone: uploadMetadata.timezone,
-        jobId: jobRes.job_id,
-        status: "generating",
-        updatedAt: Date.now(),
-      });
-      this.setData({ isUploading: false });
-
-      // 3. 平滑跳转到生成中页面
-      wx.navigateTo({
-        url: `/pages/generation/index?jobId=${jobRes.job_id}&entryId=${entryId}`,
-      });
+      wx.showToast({ title: "文字已经写在上面了", icon: "none" });
     } catch (err: any) {
-      wx.hideLoading();
       this.setData({ isUploading: false, uploadFailed: true });
-      const draft = wx.getStorageSync(diaryDraftKey()) || {};
-      wx.setStorageSync(diaryDraftKey(), Object.assign({}, draft, {
+      const draft = readDiaryDraft(diaryDraftKey());
+      writeDiaryDraft(diaryDraftKey(), Object.assign({}, draft, {
         audioPath: filePath,
         localId,
         status: "upload_failed",
@@ -371,7 +461,7 @@ Page({
   },
 
   onRetryUpload() {
-    const draft = wx.getStorageSync(diaryDraftKey());
+    const draft = readDiaryDraft(diaryDraftKey());
     const filePath = this.data.tempAudioPath || (draft && draft.audioPath);
     const localId = this.data.draftLocalId || (draft && draft.localId);
     if (!filePath || !localId) {
@@ -382,15 +472,27 @@ Page({
   },
 
   restoreAudioDraft() {
-    const draft = wx.getStorageSync(diaryDraftKey());
+    const draft = readDiaryDraft(diaryDraftKey());
+    if (draft && (draft.status === "text-draft" || draft.status === "transcribed") && draft.text) {
+      this.setData({
+        draftText: draft.text,
+        transcribedEntryId: draft.status === "transcribed" ? (draft.entryId || "") : "",
+        referencePath: draft.referencePath || "",
+        referenceId: draft.referenceId || "",
+        referenceEntryId: draft.referenceEntryId || "",
+        referenceType: draft.referenceType || "combined",
+        referenceTypeLabel: this.referenceTypeLabel(draft.referenceType || "combined"),
+        referenceIncludeInContent: draft.referenceIncludeInContent !== false,
+      });
+      return;
+    }
     if (!draft || !draft.audioPath || !draft.localId || draft.status === "generating") return;
     this.setData({ tempAudioPath: draft.audioPath, draftLocalId: draft.localId, uploadFailed: true });
   },
 
   persistAudioDraft(tempFilePath: string, localId: string, durationMs: number): Promise<string> {
     const safeId = localId.replace(/[^a-zA-Z0-9_-]/g, "");
-    const entryDate = nowIsoDate();
-    const timezone = localTimezone();
+    const { entryDate, timezone } = this.getEntryMetadata();
     const fs = wx.getFileSystemManager();
     return new Promise((resolve, reject) => {
       fs.readFile({
@@ -405,7 +507,8 @@ Page({
             tempFilePath,
             filePath: savedPath,
             success: () => {
-              wx.setStorageSync(diaryDraftKey(), {
+              const current = readDiaryDraft(diaryDraftKey());
+              writeDiaryDraft(diaryDraftKey(), Object.assign({}, current, {
                 audioPath: savedPath,
                 localId,
                 entryDate,
@@ -413,7 +516,7 @@ Page({
                 durationMs,
                 status: "recorded",
                 updatedAt: Date.now(),
-              });
+              }));
               resolve(savedPath);
             },
             fail: reject,
@@ -425,7 +528,8 @@ Page({
             tempFilePath,
             filePath: savedPath,
             success: () => {
-              wx.setStorageSync(diaryDraftKey(), {
+              const current = readDiaryDraft(diaryDraftKey());
+              writeDiaryDraft(diaryDraftKey(), Object.assign({}, current, {
                 audioPath: savedPath,
                 localId,
                 entryDate,
@@ -433,7 +537,7 @@ Page({
                 durationMs,
                 status: "recorded",
                 updatedAt: Date.now(),
-              });
+              }));
               resolve(savedPath);
             },
             fail: reject,
@@ -441,6 +545,71 @@ Page({
         },
       });
     });
+  },
+
+  onChooseReference() {
+    wx.chooseMedia({
+      count: 1,
+      mediaType: ["image"],
+      sourceType: ["album", "camera"],
+      sizeType: ["compressed"],
+      success: (res) => {
+        const filePath = res.tempFiles?.[0]?.tempFilePath || "";
+        if (filePath) {
+          this.setData({ referencePath: filePath, referenceId: "", referenceEntryId: "" });
+          const draft = readDiaryDraft(diaryDraftKey());
+          writeDiaryDraft(diaryDraftKey(), Object.assign({}, draft, { referencePath: filePath, referenceId: "", referenceEntryId: "" }));
+        }
+      },
+    });
+  },
+
+  onChooseReferenceType() {
+    const types = ["subject", "style", "scene", "tone", "combined"] as const;
+    const labels = ["主体参考", "画风参考", "场景参考", "色调参考", "综合参考"];
+    wx.showActionSheet({
+      itemList: labels,
+      success: (res) => {
+        const referenceType = types[res.tapIndex];
+        this.setData({ referenceType, referenceTypeLabel: labels[res.tapIndex], referenceId: "", referenceEntryId: "" });
+        const draft = readDiaryDraft(diaryDraftKey());
+        writeDiaryDraft(diaryDraftKey(), Object.assign({}, draft, { referenceType, referenceId: "", referenceEntryId: "" }));
+      },
+    });
+  },
+
+  onReferenceContentChange(e: WechatMiniprogram.SwitchChange) {
+    const referenceIncludeInContent = Boolean(e.detail.value);
+    this.setData({ referenceIncludeInContent, referenceId: "", referenceEntryId: "" });
+    const draft = readDiaryDraft(diaryDraftKey());
+    writeDiaryDraft(diaryDraftKey(), Object.assign({}, draft, { referenceIncludeInContent, referenceId: "", referenceEntryId: "" }));
+  },
+
+  onRemoveReference() {
+    this.setData({ referencePath: "", referenceId: "", referenceEntryId: "" });
+    const draft = readDiaryDraft(diaryDraftKey());
+    delete draft.referencePath;
+    delete draft.referenceId;
+    delete draft.referenceEntryId;
+    writeDiaryDraft(diaryDraftKey(), draft);
+  },
+
+  referenceParagraphAnchor(text: string): string {
+    const paragraphs = text.replace(/\r\n/g, "\n").split(/\n\s*\n/).map((item) => item.trim()).filter(Boolean);
+    return (paragraphs[Math.floor(Math.max(0, paragraphs.length - 1) / 2)] || text).slice(0, 120);
+  },
+
+  referenceTypeLabel(type: string): string {
+    const labels: Record<string, string> = { subject: "主体参考", style: "画风参考", scene: "场景参考", tone: "色调参考", combined: "综合参考" };
+    return labels[type] || labels.combined;
+  },
+
+  getEntryMetadata(): { entryDate: string; timezone: string } {
+    const selectedDate = this.data.targetEntryDate;
+    if (typeof selectedDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(selectedDate)) {
+      return { entryDate: `${selectedDate}T12:00:00+08:00`, timezone: "Asia/Shanghai" };
+    }
+    return { entryDate: nowIsoDate(), timezone: localTimezone() };
   },
 
   onBack() {

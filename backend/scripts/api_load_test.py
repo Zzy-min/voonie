@@ -28,9 +28,14 @@ class StageResult:
     duration_s: float
     rps: float
     p50_ms: float
+    p90_ms: float
     p95_ms: float
     p99_ms: float
+    max_ms: float
     error_rate: float
+    timeout_count: int
+    http_4xx: int
+    http_5xx: int
     statuses: dict[str, int]
 
 
@@ -126,9 +131,14 @@ async def run_stage(
         duration_s=round(duration, 3),
         rps=round(request_count / duration, 2),
         p50_ms=round(statistics.median(latencies), 2),
+        p90_ms=round(percentile(latencies, 0.90), 2),
         p95_ms=round(percentile(latencies, 0.95), 2),
         p99_ms=round(percentile(latencies, 0.99), 2),
+        max_ms=round(max(latencies, default=0), 2),
         error_rate=round(errors / request_count, 4),
+        timeout_count=sum(count for status, count in statuses.items() if "Timeout" in status),
+        http_4xx=sum(count for status, count in statuses.items() if status.startswith("4")),
+        http_5xx=sum(count for status, count in statuses.items() if status.startswith("5")),
         statuses=dict(statuses),
     )
 
@@ -143,7 +153,7 @@ async def main() -> None:
         users = await create_users(client, 50)
         await seed_entries(client, users)
         stages = []
-        for concurrency in (1, 10, 25, 50, 100, 200):
+        for concurrency in (1, 10, 25, 50, 100, 200, 300):
             request_count = max(100, concurrency * 5)
             stages.append(await run_stage(client, users, f"gradual-{concurrency}", concurrency, request_count))
         stages.append(await run_stage(client, users, "spike-up", 100, 500))

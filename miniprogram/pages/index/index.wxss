@@ -1,289 +1,43 @@
-/* pages/index/index.wxss — Antigravity pixel-perfect align */
-.home-page {
-  background-color: #FAF7F0;
-  position: relative;
-  overflow: hidden;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-.home-header {
-  padding-left: 36rpx;
-  padding-right: 36rpx;
-  padding-bottom: 8rpx;
-  position: relative;
-  z-index: 10;
-  flex-shrink: 0;
-}
-
-.header-inner {
-  height: 80rpx;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.date-text {
-  font-size: 32rpx;
-  font-weight: 600;
-  color: #3D332A;
-  letter-spacing: 1rpx;
-}
-
-.icon-btn {
-  position: relative;
-  width: 56rpx;
-  height: 56rpx;
-  background: transparent;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.action-icon-svg {
-  width: 40rpx;
-  height: 40rpx;
-  display: block;
-}
-
-/* 顶部通知红点（对齐案例第二屏铃铛右上红点） */
-.notify-dot {
-  position: absolute;
-  top: 4rpx;
-  right: 4rpx;
-  width: 14rpx;
-  height: 14rpx;
-  border-radius: 50%;
-  background-color: #D9845B;
-  border: 2rpx solid #FAF7F0;
-}
-
-/* 真实居室环境切片（对齐案例第二屏：百叶窗光、挂画、圆地毯、小狗、手帐与玩具球） */
-.home-room-bg {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 0;
-  pointer-events: none;
-}
-
-/* 居室场景 —— 贴合小狗与地毯落点，角色与气泡紧密咬合，消除空荡大间距 */
-.home-scene {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  position: relative;
-  padding: 0 36rpx calc(230rpx + env(safe-area-inset-bottom));
-  overflow: hidden;
-  z-index: 1;
-}
-
-/* 问候气泡 —— 紧贴小狗头顶上边缘，正对头部视线 */
-.greeting-bubble {
-  position: relative;
-  margin-bottom: 8rpx;
-  background-color: #FFFCF8;
-  border: 2rpx solid #E8DFD3;
-  border-radius: 36rpx;
-  padding: 14rpx 36rpx;
-  box-shadow: 0 6rpx 20rpx rgba(61, 51, 42, 0.07);
-  z-index: 10;
-  cursor: pointer;
-}
-
-.bubble-text {
-  font-size: 28rpx;
-  color: #3D332A;
-  font-weight: 500;
-  letter-spacing: 0.5rpx;
-}
-
-.bubble-arrow {
-  position: absolute;
-  bottom: -14rpx;
-  left: 48%;
-  transform: translateX(-50%);
-  width: 0;
-  height: 0;
-  border-left: 14rpx solid transparent;
-  border-right: 14rpx solid transparent;
-  border-top: 14rpx solid #FFFCF8;
-}
-
-/* 主角小狗透明热区 —— ui-bg-home 已烘焙小狗，严禁叠图，仅透明 hitbox */
-.dog-hero-container {
-  position: relative;
-  width: 460rpx;
-  height: 480rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 5;
-}
-
-.dog-hero-hotzone {
-  background: transparent;
-}
-
-/* 细腻柔和点击爱心微反馈，默认隐藏，拒绝原生大 emoji */
-.heart-burst {
-  position: absolute;
-  top: 50rpx;
-  right: 110rpx;
-  pointer-events: none;
-  animation: floatHeart 1s ease-out forwards;
-}
-
-.heart-shape {
-  width: 28rpx;
-  height: 28rpx;
-  background-color: #E87A5D;
-  transform: rotate(45deg);
-  border-radius: 4rpx;
-  position: relative;
-}
-
-.heart-shape::before,
-.heart-shape::after {
-  content: '';
-  width: 28rpx;
-  height: 28rpx;
-  background-color: #E87A5D;
-  border-radius: 50%;
-  position: absolute;
-}
-
-.heart-shape::before {
-  top: -14rpx;
-  left: 0;
-}
-
-.heart-shape::after {
-  left: -14rpx;
-  top: 0;
-}
-
-@keyframes floatHeart {
-  0% {
-    opacity: 0.9;
-    transform: scale(0.6) translateY(0);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.1) translateY(-30rpx);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(1.3) translateY(-70rpx);
-  }
-}
-
-/* 案例式底栏：一体化大圆角胶囊输入条 + 麦克风入口（对齐案例：宽度居中浮于地毯下部） */
-.home-input-bar {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: calc(130rpx + env(safe-area-inset-bottom));
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12rpx;
-  z-index: 20;
-}
-
-/* 草稿提示弱化下移至输入胶囊正上方，不遮挡居室小狗与地毯 */
-.draft-notice {
-  background-color: rgba(253, 243, 235, 0.94);
-  border: 1rpx solid rgba(240, 212, 190, 0.85);
-  padding: 8rpx 24rpx;
-  border-radius: 9999rpx;
-  display: flex;
-  align-items: center;
-  gap: 10rpx;
-  box-shadow: 0 4rpx 12rpx rgba(118, 93, 70, 0.06);
-  backdrop-filter: blur(4px);
-}
-
-.draft-icon {
-  font-size: 20rpx;
-}
-
-.draft-text {
-  font-size: 22rpx;
-  color: #C26741;
-  font-weight: 500;
-}
-
-.draft-arrow {
-  font-size: 20rpx;
-  color: #C26741;
-}
-
-.home-capsule-bar {
-  width: 580rpx;
-  max-width: 90%;
-  box-sizing: border-box;
-  height: 84rpx;
-  background-color: #FFFBF5;
-  border: 2rpx solid #E8DFD3;
-  border-radius: 9999rpx;
-  padding: 0 20rpx 0 26rpx;
-  display: flex;
-  align-items: center;
-  gap: 14rpx;
-  box-shadow: 0 6rpx 20rpx rgba(118, 93, 70, 0.08);
-}
-
-.home-capsule-mic {
-  width: 48rpx;
-  height: 48rpx;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.home-capsule-mic:active {
-  transform: scale(0.92);
-}
-
-.capsule-mic-img {
-  width: 38rpx;
-  height: 38rpx;
-  display: block;
-}
-
-.home-capsule-input {
-  flex: 1;
-  height: 80rpx;
-  font-size: 28rpx;
-  color: #3D332A;
-}
-
-.home-input-placeholder {
-  color: #ABA094;
-}
-
-.home-capsule-send {
-  width: 60rpx;
-  height: 60rpx;
-  border-radius: 50%;
-  background: #D9845B;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4rpx 12rpx rgba(217, 132, 91, 0.3);
-  flex-shrink: 0;
-}
-
-.capsule-send-arrow {
-  color: #FFFFFF;
-  font-size: 26rpx;
-  font-weight: bold;
-}
+.home-page { background: #FFF9F1; }
+.home-header { position: relative; z-index: 4; background: #FFF9F1; }
+.header-inner { padding-left: 40rpx; display: flex; align-items: center; justify-content: space-between; }
+.date-text, .brand-text { display: block; }
+.date-text { font-size: 24rpx; color: #7C6A5C; }
+.brand-text { margin-top: 2rpx; font-size: 30rpx; font-weight: 650; color: #3E3026; }
+.icon-btn { width: 64rpx; height: 64rpx; display: flex; align-items: center; justify-content: center; }
+.icon-btn image { width: 38rpx; height: 38rpx; }
+.home-scroll { flex: 1; min-height: 0; }
+.hero { margin: 20rpx 40rpx 0; min-height: 590rpx; position: relative; overflow: hidden; border-radius: 32rpx; background: #FBF2E7; }
+.hero-copy { padding: 48rpx 40rpx 0; position: relative; z-index: 2; }
+.hero-title { display: block; font-size: 44rpx; line-height: 1.25; font-weight: 650; color: #3E3026; }
+.hero-subtitle { display: block; margin-top: 14rpx; font-size: 27rpx; color: #7C6A5C; }
+.hero-vonnie { width: 360rpx; height: 310rpx; margin: 8rpx auto 0; }
+.heart-burst { position: absolute; top: 190rpx; right: 130rpx; color: #E6B7B0; font-size: 64rpx; }
+.primary-record { width: calc(100% - 64rpx); height: 92rpx; margin: -8rpx 32rpx 0; border-radius: 24rpx; background: #E8A74C; color: #3E3026; display: flex; align-items: center; justify-content: center; gap: 14rpx; font-size: 31rpx; font-weight: 600; }
+.primary-record:active { transform: scale(.98); background: #D9983C; }
+.primary-record image { width: 36rpx; height: 36rpx; }
+.draft-notice { margin: 16rpx 32rpx 0; display: flex; justify-content: space-between; color: #7C6A5C; font-size: 24rpx; }
+.section { margin: 48rpx 40rpx 0; }
+.recent-section { padding-bottom: 52rpx; }
+.section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20rpx; }
+.section-title { font-size: 32rpx; line-height: 1.3; font-weight: 650; color: #3E3026; }
+.section-link { font-size: 24rpx; color: #A06D28; }
+.state-row, .empty-row, .diary-row, .memory-row { background: #FFFDF8; border-top: 1rpx solid #EEE3D5; border-bottom: 1rpx solid #EEE3D5; }
+.state-row { min-height: 116rpx; display: flex; align-items: center; color: #7C6A5C; font-size: 26rpx; }
+.state-action { color: #A06D28; }
+.empty-row { min-height: 142rpx; display: flex; align-items: center; justify-content: space-between; }
+.empty-title, .empty-copy { display: block; }
+.empty-title { font-size: 27rpx; font-weight: 550; color: #3E3026; }
+.empty-copy { margin-top: 8rpx; font-size: 24rpx; color: #7C6A5C; }
+.row-arrow { font-size: 40rpx; color: #A89789; }
+.diary-row { min-height: 166rpx; padding: 20rpx 0; display: flex; gap: 22rpx; }
+.diary-copy { flex: 1; min-width: 0; }
+.diary-mood { display: inline-block; padding: 5rpx 14rpx; border-radius: 999rpx; background: #F8DCA8; color: #6F4C20; font-size: 20rpx; }
+.diary-title { display: block; margin-top: 12rpx; font-size: 30rpx; font-weight: 620; color: #3E3026; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.diary-summary, .memory-summary { display: -webkit-box; margin-top: 8rpx; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; color: #7C6A5C; font-size: 24rpx; line-height: 1.5; }
+.diary-cover { width: 150rpx; height: 126rpx; border-radius: 16rpx; background: #F8F1E8; }
+.memory-row { padding: 20rpx 0; display: flex; gap: 22rpx; }
+.memory-cover { width: 164rpx; height: 128rpx; border-radius: 16rpx; background: #F8F1E8; }
+.memory-copy { flex: 1; min-width: 0; }
+.memory-date { display: block; font-size: 22rpx; color: #A89789; }
+.memory-title { display: block; margin-top: 6rpx; font-size: 28rpx; font-weight: 600; color: #3E3026; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

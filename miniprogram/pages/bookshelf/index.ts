@@ -16,6 +16,7 @@ Page({
     }>,
     empty: false,
     failed: false,
+    loading: true,
   },
 
   allDiaries: [] as DiaryItem[],
@@ -32,18 +33,11 @@ Page({
   },
 
   onShow() {
-    const app = getApp();
-    if (app && app.globalData) {
-      app.globalData.activeTab = 3;
-    }
-    const tab = typeof this.getTabBar === "function" ? this.getTabBar() : null;
-    if (tab && typeof tab.setSelected === "function") {
-      tab.setSelected(3);
-    }
     this.loadBookshelf();
   },
 
   async loadBookshelf() {
+    this.setData({ loading: true, failed: false });
     try {
       const list = await listDiaries();
       const safeList = Array.isArray(list) ? list : [];
@@ -54,7 +48,7 @@ Page({
     } catch (e) {
       console.warn("Load bookshelf failed:", e);
       // 不再伪造数据：展示空态 + 可重试
-      this.setData({ books: [], empty: true, failed: true });
+      this.setData({ books: [], empty: true, failed: true, loading: false });
     }
   },
 
@@ -75,6 +69,7 @@ Page({
         books: Array.isArray(books) ? books : [],
         empty: books.length === 0,
         failed: false,
+        loading: false,
       });
   },
 
@@ -96,7 +91,7 @@ Page({
 
   // 分享广场（子入口）
   onOpenSquare() {
-    wx.navigateTo({ url: "/pages/square/index" });
+    wx.switchTab({ url: "/pages/square/index" });
   },
 
   // 回忆日历（子入口，视觉丰富书架）

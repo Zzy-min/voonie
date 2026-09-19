@@ -85,20 +85,31 @@ async def execute_comic_job(context: dict[str, Any], job_id: str) -> None:
 
         if not await update_job(session_factory, job_id, status="running", stage="rendering", progress=0.25):
             return
-        async def render_one(index_panel):
+        character_bible = request_data.get("character_bible")
+        identity_seed = request_data.get("character_seed")
+
+        async def render_one(index_panel, identity_reference):
             index, panel = index_panel
             image_path, prompt = await context["image_service"].generate_panel_image(
                 panel,
                 character,
                 request_data.get("custom_style"),
-                ref_image=ref_image_bytes,
+                ref_image=identity_reference,
+                character_bible=character_bible,
+                seed=identity_seed,
             )
             panel.image_url = context["storage"].get_file_url(image_path)
             return index, image_path, prompt
 
-        rendered = await asyncio.gather(
-            *[render_one((index, panel)) for index, panel in enumerate(storyboard.panels, start=1)]
+        indexed_panels = list(enumerate(storyboard.panels, start=1))
+        first_rendered = await render_one(indexed_panels[0], ref_image_bytes)
+        # 后续画面始终复用明确的角色参考；若用户没有上传参考图，就以首图
+        # 作为本篇日记的身份锚点，避免每张图独立抽样后更换主人公。
+        identity_reference = ref_image_bytes or first_rendered[1].read_bytes()
+        remaining = await asyncio.gather(
+            *[render_one(item, identity_reference) for item in indexed_panels[1:]]
         )
+        rendered = [first_rendered, *remaining]
         rendered.sort(key=lambda item: item[0])
         panel_paths = [item[1] for item in rendered]
         prompts = {item[0]: item[2] for item in rendered}

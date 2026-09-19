@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import update
 from sqlalchemy.exc import IntegrityError
@@ -9,11 +9,22 @@ from voonie.backend.app.db.models import RateLimitCounter
 
 
 class RateLimiter:
+    @staticmethod
+    def _limit_error(now: datetime) -> ApiError:
+        next_window = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+        retry_after = max(1, int((next_window - now).total_seconds()))
+        return ApiError(
+            429,
+            "rate_limit_exceeded",
+            "Too many requests; retry next hour",
+            headers={"Retry-After": str(retry_after)},
+        )
+
     async def consume(
         self, db: AsyncSession, user_id: str, scope: str, limit: int, *, commit: bool = True
     ) -> None:
         if limit <= 0:
-            raise ApiError(429, "rate_limit_exceeded", "Too many requests")
+            raise self._limit_error(datetime.now(timezone.utc))
         now = datetime.now(timezone.utc)
         window_start = now.replace(minute=0, second=0, microsecond=0)
         changed = await db.execute(
@@ -53,5 +64,5 @@ class RateLimiter:
         )
         if changed.rowcount != 1:
             await db.rollback()
-            raise ApiError(429, "rate_limit_exceeded", "Too many requests; retry next hour")
+            raise self._limit_error(now)
         await (db.commit() if commit else db.flush())

@@ -75,6 +75,10 @@ Page({
     wx.navigateTo({ url: "/pages/calendar/index" });
   },
 
+  onOpenBookshelf() {
+    wx.navigateTo({ url: "/pages/bookshelf/index" });
+  },
+
   onRetry() {
     this.setData({ loading: true });
     this.loadLatest();

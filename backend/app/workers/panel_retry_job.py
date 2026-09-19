@@ -42,12 +42,25 @@ async def execute_panel_retry_job(context: dict, job_id: str) -> None:
             appearance_prompt=snapshot.get("appearance_prompt", CharacterConfig().appearance_prompt),
             style_preset=snapshot.get("style_preset", "chibi_manga"),
         )
+        sibling = await session.scalar(
+            select(Panel).where(
+                Panel.artifact_id == artifact.id,
+                Panel.panel_no != panel.panel_no,
+            ).order_by(Panel.panel_no)
+        )
+        identity_reference = (
+            Path(sibling.image_key).read_bytes()
+            if sibling is not None and sibling.image_key and Path(sibling.image_key).is_file()
+            else None
+        )
 
     try:
         image_path, prompt = await context["image_service"].generate_panel_image(
             storyboard_panel,
             character,
             None,
+            ref_image=identity_reference,
+            character_bible=snapshot.get("bible"),
         )
         storyboard_panel.image_url = context["storage"].get_file_url(image_path)
         async with session_factory() as session:

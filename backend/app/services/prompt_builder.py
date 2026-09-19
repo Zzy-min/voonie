@@ -7,16 +7,16 @@ from voonie.backend.app.models.schemas import CharacterConfig, ComicPanel
 
 DEFAULT_BIBLE = {
     "age_range": "young adult",
-    "hair": "short brown hair",
-    "outfit": "oversized yellow hoodie",
-    "body": "small chibi proportions",
-    "features": "round glasses",
-    "accessories": "none",
+    "hair": "follow the main protagonist description exactly",
+    "outfit": "follow the main protagonist description exactly",
+    "body": "natural human anatomy with tasteful illustrated proportions",
+    "features": "follow the main protagonist description exactly",
+    "accessories": "follow the main protagonist description exactly",
     "companion_dog": (
         "a cute cheerful fluffy orange-and-white puppy named Voonie "
         "(corgi-shiba hybrid, soft fluffy ears, round sparkling eyes, joyful smile, wagging tail)"
     ),
-    "locked": ["hairstyle", "main outfit color", "signature glasses", "puppy appearance"],
+    "locked": ["human identity", "gender presentation", "age", "face", "hairstyle", "main outfit", "accessories"],
 }
 
 
@@ -46,8 +46,9 @@ def build_panel_prompt(
     )
 
     ref_header = (
-        "【STRICT VISUAL REFERENCE】Strictly maintain the character and scene appearance from the reference image. "
-        "Keep facial features, hair, clothing colors, and pet appearance identical to the reference. "
+        "【STRICT CHARACTER REFERENCE】Use the reference image to lock the main protagonist's identity. "
+        "Keep the same face, gender presentation, apparent age, hairstyle, hair color, outfit colors, and accessories. "
+        "The scene and pose may change, but the protagonist must remain recognizably the same person. "
     ) if use_ref else ""
 
     context_str = f"{panel.scene_desc} {panel.character_action}".lower()
@@ -68,7 +69,13 @@ def build_panel_prompt(
 
     return (
         f"{ref_header}Comic panel illustration. {style_prompt}. "
-        f"Stable character: {character.appearance_prompt}. {dog_clause}"
+        f"Main protagonist: {character.appearance_prompt}. "
+        "In every panel, the phrase 'main protagonist' refers to this exact same person and nobody else. "
+        "Do not replace the protagonist with another person, change their gender presentation, hairstyle, face, age, or outfit. "
+        "Show additional people only when the source-grounded memory explicitly requires them; they must look clearly different and remain secondary. "
+        "The main protagonist is a human person with normal human anatomy. "
+        "Never add animal ears, animal nose, muzzle, paws, fur, tail, or merge the companion pet into the human. "
+        f"{dog_clause}"
         f"Age range: {card.get('age_range')}; hair: {card.get('hair')}; outfit: {card.get('outfit')}; "
         f"body: {card.get('body')}; features: {card.get('features')}; accessories: {card.get('accessories')}. "
         f"Keep locked traits unchanged: {locked}. "
@@ -76,5 +83,6 @@ def build_panel_prompt(
         "Critical source facts must be visibly present and take priority over decorative choices, "
         "especially the stated time of day, weather, location, objects, and lighting. "
         f"Masterpiece, beautiful clean line art, luminous ambient lighting, rich color harmony. "
-        f"Negative constraints: {forbidden}. No speech balloons, no captions, no readable text. Negative: distorted anatomy, deformed fingers, extra limbs, watermark, blurry, low resolution."
+        f"Negative constraints: {forbidden}. No speech balloons, no captions, no readable text. "
+        "Negative: human-animal hybrid, dog ears on a person, animal muzzle on a person, distorted anatomy, deformed fingers, extra limbs, watermark, blurry, low resolution."
     )

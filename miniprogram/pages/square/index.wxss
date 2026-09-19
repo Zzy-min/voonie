@@ -20,7 +20,6 @@
 .square-header {
   position: relative;
   z-index: 1;
-  padding: 0 36rpx;
 }
 
 .header-nav {
@@ -31,6 +30,7 @@
   box-sizing: border-box;
   position: relative;
   width: 100%;
+  padding-left: 36rpx;
 }
 
 .back-btn {
@@ -54,14 +54,15 @@
   color: #3D332A;
   letter-spacing: 1rpx;
   position: absolute;
-  left: 200rpx;
+  left: 50%;
+  transform: translateX(-50%);
   white-space: nowrap;
 }
 
 .square-tabs-row {
   display: flex;
   align-items: center;
-  padding: 8rpx 0 16rpx;
+  padding: 8rpx 36rpx 16rpx;
 }
 
 .square-tabs {
@@ -104,9 +105,11 @@
 
 .square-scroll-body {
   flex: 1;
-  padding: 10rpx 36rpx 40rpx;
+  width: 100%;
+  padding: 10rpx 36rpx calc(160rpx + env(safe-area-inset-bottom));
   position: relative;
   z-index: 1;
+  box-sizing: border-box;
 }
 
 .square-empty {
@@ -164,6 +167,8 @@
   padding: 30rpx 28rpx;
   margin-bottom: 30rpx;
   box-shadow: 0 6rpx 24rpx rgba(61, 51, 42, 0.05);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .feed-user-bar {

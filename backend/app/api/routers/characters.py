@@ -119,6 +119,23 @@ async def update_character(
     return serialize(character, request.app.state.storage)
 
 
+@router.delete("/{character_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_character(
+    character_id: str,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    character = await owned_character(db, character_id, current_user.id)
+    media_keys = [item.media_key for item in character.references]
+    if character.reference_image_key:
+        media_keys.append(character.reference_image_key)
+    await db.delete(character)
+    await db.commit()
+    for media_key in set(media_keys):
+        request.app.state.storage.delete(media_key)
+
+
 @router.post("/{character_id}/references", response_model=CharacterReferenceResponse, status_code=status.HTTP_201_CREATED)
 async def upload_reference(
     character_id: str,

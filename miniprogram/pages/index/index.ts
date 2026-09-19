@@ -1,6 +1,6 @@
 // pages/index/index.ts
 import { getNavInfo } from "../../utils/nav";
-import { diaryDraftKey } from "../../utils/api";
+import { authenticatedMediaUrl, diaryDraftKey, DiaryItem, listDiaries } from "../../utils/api";
 
 Page({
   data: {
@@ -12,6 +12,10 @@ Page({
     showHeart: false,
     hasDraft: false,
     inputText: "",
+    diaryLoading: true,
+    diaryFailed: false,
+    todayDiary: null as (DiaryItem & { cover?: string }) | null,
+    recentDiary: null as (DiaryItem & { cover?: string }) | null,
   },
 
   onLoad() {
@@ -47,6 +51,38 @@ Page({
     this.setData({
       hasDraft: Boolean(draft && (draft.text || draft.audioPath)),
     });
+    this.loadHomeDiaries();
+  },
+
+  async loadHomeDiaries() {
+    this.setData({ diaryLoading: true, diaryFailed: false });
+    try {
+      const diaries = await listDiaries();
+      const safe = Array.isArray(diaries) ? diaries : [];
+      const now = new Date();
+      const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      const dateKey = (item: DiaryItem) => {
+        const value = item.entry_date || item.created_at || "";
+        const direct = value.match(/^(\d{4}-\d{2}-\d{2})/);
+        return direct ? direct[1] : "";
+      };
+      const today = safe.find((item) => dateKey(item) === todayKey) || null;
+      const recent = safe.find((item) => !today || item.id !== today.id) || null;
+      const withCover = async (item: DiaryItem | null) => {
+        if (!item) return null;
+        const first = Array.isArray(item.panels) ? item.panels[0] : null;
+        const cover = first && first.image_url ? await authenticatedMediaUrl(first.image_url) : "";
+        return { ...item, cover };
+      };
+      this.setData({
+        todayDiary: await withCover(today),
+        recentDiary: await withCover(recent),
+        diaryLoading: false,
+      });
+    } catch (error) {
+      console.warn("Load home diaries failed:", error);
+      this.setData({ diaryLoading: false, diaryFailed: true });
+    }
   },
 
   updateDateDisplay() {
@@ -95,7 +131,7 @@ Page({
   },
 
   onGoBookshelf() {
-    wx.switchTab({
+    wx.navigateTo({
       url: "/pages/bookshelf/index",
     });
   },
@@ -125,5 +161,14 @@ Page({
     wx.navigateTo({
       url: "/pages/record/index",
     });
+  },
+
+  onOpenDiary(e: WechatMiniprogram.BaseEvent) {
+    const id = e.currentTarget.dataset.id;
+    if (id) wx.navigateTo({ url: `/pages/diary/index?id=${id}` });
+  },
+
+  onOpenMemories() {
+    wx.navigateTo({ url: "/pages/calendar/index" });
   },
 });

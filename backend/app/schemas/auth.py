@@ -27,13 +27,27 @@ class WeChatLoginRequest(BaseModel):
     code: str = Field(min_length=1, max_length=128)
 
 
+class WeChatPhoneLoginRequest(BaseModel):
+    code: str = Field(min_length=1, max_length=256)
+
+
+class IdentityStatusResponse(BaseModel):
+    email_bound: bool
+    email_masked: str | None = None
+    wechat_bound: bool
+    phone_bound: bool
+    phone_masked: str | None = None
+
+
 class UserResponse(BaseModel):
     id: str
     email: str | None = None
+    phone: str | None = None
     nickname: str = "小主人"
     quote: str = "生活或许忙碌，但记得停下来，听一听自己的声音。"
     quote_note: str = "今天也值得被好好收藏。"
     memory_opt_in: bool = True
+    wechat_bound: bool = False
     created_at: str | None = None
 
 
@@ -44,5 +58,6 @@ class TokenResponse(BaseModel):
     expires_in: int
     user_id: str
     email: str | None = None
+    phone: str | None = None
     nickname: str | None = None
     device_secret: str | None = None
