@@ -35,7 +35,8 @@
   min-height: 0;
   position: relative;
   z-index: 1;
-  padding: 0 40rpx;
+  /* 给主内容留出稳定的呼吸区，并消化高屏设备底部的无效留白。 */
+  padding: 72rpx 40rpx 0;
   box-sizing: border-box;
 }
 
@@ -44,6 +45,7 @@
   align-items: center;
   gap: 20rpx;
   height: 88rpx;
+  margin-top: 36rpx;
 }
 
 .back-btn {
@@ -251,6 +253,22 @@
   padding: 18rpx 40rpx calc(24rpx + env(safe-area-inset-bottom));
   border-top: 1rpx solid #eee3d5;
   background: rgba(250, 247, 240, 0.96);
+}
+
+/* 矮屏保持主要输入与提交操作可见，高屏则采用更舒展的纵向节奏。 */
+@media (max-height: 720px) {
+  .header-nav {
+    margin-top: 16rpx;
+  }
+
+  .record-body {
+    padding-top: 28rpx;
+  }
+
+  .listening-dog-box {
+    width: 300rpx;
+    height: 306rpx;
+  }
 }
 
 .recording-actions,
