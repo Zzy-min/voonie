@@ -51,10 +51,19 @@
           <view class="diary-text-paragraph" wx:if="{{item.type === 'text'}}">
             <text>{{item.text}}</text>
           </view>
-          <view class="comic-illustration-card" wx:else data-url="{{item.url}}" bindtap="onPreviewImage">
-            <image class="comic-img" src="{{item.url}}" mode="aspectFill" />
+          <view class="comic-illustration-card" wx:else>
+            <image wx:if="{{item.imageStatus === 'ready' || !item.imageStatus}}" class="comic-img" src="{{item.url}}" mode="widthFix" data-key="{{item.key}}" data-url="{{item.url}}" bindtap="onPreviewImage" binderror="onImageError" />
+            <view wx:else class="image-placeholder" data-key="{{item.key}}" bindtap="onRetryImage">{{item.imageStatus === 'failed' ? '图片加载失败，点按重试' : '图片正在加载…'}}</view>
           </view>
         </block>
+      </view>
+
+      <view class="companion-note" wx:if="{{!readOnly && diary.companion_note}}">
+        <image src="/assets/images/voonie/voonie-sit.png" mode="aspectFit" />
+        <view>
+          <text class="companion-note-title">Vonnie 想对你说</text>
+          <text class="companion-note-copy">{{diary.companion_note}}</text>
+        </view>
       </view>
       </view>
     </scroll-view>
@@ -69,7 +78,7 @@
 
     <view class="tool-btn" bindtap="onShare">
       <image class="tool-icon-svg" src="/assets/icons/icon-star.svg" mode="aspectFit" />
-      <text class="tool-label">{{readOnly ? '分享这篇' : '分享给朋友'}}</text>
+      <text class="tool-label">分享小程序</text>
     </view>
     <view class="tool-btn danger-tool" wx:if="{{!readOnly}}" bindtap="onDelete">
       <text class="delete-icon">×</text>

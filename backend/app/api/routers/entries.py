@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from voonie.backend.app.api.deps import get_current_user
+from voonie.backend.app.api.content_review import review_image, review_text
 from voonie.backend.app.core.exceptions import ApiError
 from voonie.backend.app.db.models import Character, DiaryArtifact, DiaryEntry, DiaryReference, Job, Panel, User
 from voonie.backend.app.db.session import get_db
@@ -107,6 +108,7 @@ async def create_text_entry(
 ) -> EntryResponse:
     if idempotency_key != body.local_id:
         raise ApiError(409, "idempotency_mismatch", "Idempotency-Key must match local_id")
+    await review_text(request, current_user, body.text)
     source_hash = source_fingerprint(
         "text", hashlib.sha256(body.text.encode("utf-8")).hexdigest(), body.entry_date, body.timezone
     )
@@ -233,6 +235,7 @@ async def create_voice_entry(
         reserved = True
         audio_bytes = await asyncio.to_thread(temp_path.read_bytes)
         audio = await request.app.state.asr_service.transcribe(audio_bytes, filename=audio_file.filename or temp_path.name)
+        await review_text(request, current_user, audio)
         emotion, events, status_name = await analyze_entry_text(
             request,
             audio,
@@ -305,6 +308,8 @@ async def update_entry(
 ):
     entry = await owned_entry(db, entry_id, current_user.id)
     changes = body.model_dump(exclude_unset=True)
+    if "text" in changes:
+        await review_text(request, current_user, changes["text"])
     if "text" in changes:
         entry.redacted_text = changes.pop("text")
     if "entry_date" in changes:
@@ -405,6 +410,13 @@ async def upload_diary_reference(
         raise
     except Exception as exc:
         raise ApiError(415, "invalid_image", "Reference image is not valid") from exc
+    if request.app.state.settings.CONTENT_REVIEW_ENABLED and current_user.wechat_openid:
+        with Image.open(BytesIO(payload)) as image:
+            reviewed = BytesIO()
+            image.convert("RGB").save(reviewed, format="PNG")
+        await review_image(request, current_user, reviewed.getvalue(), "image/png")
+    if paragraph_anchor:
+        await review_text(request, current_user, paragraph_anchor)
     saved = request.app.state.storage.save_bytes(payload, suffix=".png")
     reference = DiaryReference(
         user_id=current_user.id,
@@ -446,10 +458,13 @@ async def create_entry_comic_job(
     character_bible = None
     character_seed = None
     reference_b64 = body.ref_image_b64 if body else None
-    diary_reference = None
-    if body and body.reference_id:
+    reference_already_stored = False
+    diary_references = []
+    reference_inputs = []
+    reference_ids = (body.reference_ids or ([body.reference_id] if body.reference_id else [])) if body else []
+    for reference_id in reference_ids:
         diary_reference = await db.scalar(select(DiaryReference).where(
-            DiaryReference.id == body.reference_id,
+            DiaryReference.id == reference_id,
             DiaryReference.entry_id == entry.id,
             DiaryReference.user_id == current_user.id,
         ))
@@ -458,7 +473,12 @@ async def create_entry_comic_job(
         reference_path = Path(diary_reference.media_key)
         if not reference_path.is_file():
             raise ApiError(410, "diary_reference_missing", "Diary reference file is missing")
-        reference_b64 = base64.b64encode(reference_path.read_bytes()).decode("ascii")
+        reference_inputs.append({
+            "image_b64": base64.b64encode(reference_path.read_bytes()).decode("ascii"),
+            "type": diary_reference.reference_type,
+        })
+        diary_references.append(diary_reference)
+        reference_already_stored = not bool(reference_b64)
     if body and body.character_id:
         saved_character = await db.scalar(
             select(Character)
@@ -497,23 +517,31 @@ async def create_entry_comic_job(
         )
         if approved_reference and Path(approved_reference.media_key).is_file():
             reference_b64 = base64.b64encode(Path(approved_reference.media_key).read_bytes()).decode("ascii")
+            reference_already_stored = True
+    if body and body.style_preset_override:
+        character = character.model_copy(update={"style_preset": body.style_preset_override})
     payload = {
         "text": entry.redacted_text,
         "character": character.model_dump(mode="json"),
         "character_bible": character_bible,
         "character_seed": character_seed,
         "custom_style": body.custom_style if body else None,
+        "aspect_ratio": body.aspect_ratio if body else "4:3",
         "ref_image_b64": reference_b64,
         "local_id": entry.local_id,
         "timezone": entry.timezone,
         "input_type": entry.input_type,
         "entry_id": entry.id,
-        "reference_image": ({
+        "reference_inputs": reference_inputs,
+        "reference_images": [{
             "id": diary_reference.id,
             "image_url": request.app.state.storage.get_file_url(diary_reference.media_key),
             "reference_type": diary_reference.reference_type,
             "include_in_content": diary_reference.include_in_content,
             "paragraph_anchor": diary_reference.paragraph_anchor,
-        } if diary_reference else None),
+        } for diary_reference in diary_references],
     }
-    return await enqueue_comic_job(request, db, current_user, payload, idempotency_key)
+    return await enqueue_comic_job(
+        request, db, current_user, payload, idempotency_key,
+        reference_already_stored=reference_already_stored,
+    )

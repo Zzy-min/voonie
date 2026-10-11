@@ -5,6 +5,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from voonie.backend.app.api.deps import get_current_user
+from voonie.backend.app.api.content_review import review_text
 from voonie.backend.app.db.models import Character, CharacterReference, DailyDiary, DiaryArtifact, DiaryEntry, DiaryReference, Job, MemoryItem, Panel, PetSession, RateLimitCounter, RefreshToken, User
 from voonie.backend.app.db.session import get_db
 from voonie.backend.app.schemas.me import PreferencesResponse, PreferencesUpdate
@@ -28,13 +29,16 @@ async def get_preferences(current_user: User = Depends(get_current_user)) -> Pre
     return serialize(current_user)
 
 
+@router.put("/preferences", response_model=PreferencesResponse)
 @router.patch("/preferences", response_model=PreferencesResponse)
 async def update_preferences(
     body: PreferencesUpdate,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> PreferencesResponse:
     changes = body.model_dump(exclude_unset=True)
+    await review_text(request, current_user, "\n".join(str(changes[key]) for key in ("nickname", "quote", "quote_note") if changes.get(key)))
     for key, value in changes.items():
         setattr(current_user, key, value)
     if body.memory_opt_in is False:

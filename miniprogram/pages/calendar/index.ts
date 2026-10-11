@@ -1,7 +1,7 @@
 // pages/calendar/index.ts - 回忆日历（日记子页）
 // Q&A-FIX(P1)：真实年月网格 + hasDiary/当日卡片全部来自 listDiaries 聚合，禁止硬编码日期。
 // 顶部返回回到手帐根页；点日期进该日对应日记。
-import { authenticatedMediaUrl, listDiaries, DiaryItem } from "../../utils/api";
+import { authenticatedMediaUrl, getAccessToken, listDiaries, DiaryItem, getSessionScope, subscribeDiaryUpdates } from "../../utils/api";
 
 interface CalendarDay {
   id: string;
@@ -31,12 +31,14 @@ function toDateKey(d: Date): string {
 }
 
 import { getNavInfo } from "../../utils/nav";
+import { enableHomeShareMenu, homeShareHandlers } from "../../utils/homeShare";
 
 function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
 
 Page({
+  ...homeShareHandlers,
   data: {
     statusBarHeight: 20,
     navBarHeight: 44,
@@ -57,9 +59,13 @@ Page({
   diariesByDate: {} as Record<string, DiaryItem[]>,
   allDiaries: [] as DiaryItem[],
   _initedOnce: false as boolean,
+  fetchRevision: 0,
+  stopUpdates: null as null | (() => void),
   stateKey: "voling_calendar_state",
 
   onLoad() {
+    this.stopUpdates = subscribeDiaryUpdates(() => this.fetchDiaries());
+    enableHomeShareMenu();
     const nav = getNavInfo();
     const now = new Date();
     const saved = wx.getStorageSync(this.stateKey) || {};
@@ -88,9 +94,19 @@ Page({
 
   // 拉取用户日记并按本地日期聚合（禁止硬编码日期标记）
   async fetchDiaries() {
+    const scope = getSessionScope(), revision = ++this.fetchRevision;
+    if (!getAccessToken()) {
+      this.allDiaries = [];
+      this.diariesByDate = {};
+      this.generateCalendar();
+      this.renderTodayMemories();
+      this.setData({ loading: false, failed: false });
+      return;
+    }
     this.setData({ loading: true, failed: false });
     try {
       const list = await listDiaries();
+      if (scope !== getSessionScope() || revision !== this.fetchRevision) return;
       this.allDiaries = Array.isArray(list) ? list : [];
       const map: Record<string, DiaryItem[]> = {};
       for (const d of this.allDiaries) {
@@ -104,10 +120,12 @@ Page({
       this.generateCalendar();
       this.renderTodayMemories();
     } catch (e) {
+      if (scope !== getSessionScope() || revision !== this.fetchRevision) return;
       console.warn("Fetch diaries error:", e);
       this.setData({ loading: false, failed: true, dayMemories: [] });
     }
   },
+  onUnload() { this.fetchRevision += 1; this.stopUpdates?.(); },
 
   // 优先使用用户记录时提交的业务日期和时区；旧数据才回退 created_at。
   diaryDateKey(d: DiaryItem): string {

@@ -34,19 +34,20 @@
         <image class="quick-login-icon" src="/assets/icons/icon-wechat.svg" mode="aspectFit" />
         <text>微信快捷登录</text>
       </button>
-      <button class="quick-login-btn phone-secondary" open-type="getPhoneNumber" loading="{{authAction === 'phone'}}" disabled="{{authAction !== ''}}" bindgetphonenumber="onPhoneLogin" hover-class="quick-login-btn--pressed">
+      <text wx:if="{{trialExhausted}}" class="privacy-hint">游客体验已完成，使用微信登录后可继续生成日记</text>
+      <button wx:if="{{!trialExhausted}}" class="quick-login-btn phone-secondary" open-type="getPhoneNumber" loading="{{authAction === 'phone'}}" disabled="{{authAction !== ''}}" bindgetphonenumber="onPhoneLogin" hover-class="quick-login-btn--pressed">
         <view class="phone-icon">手机</view>
         <text>手机号快捷登录</text>
       </button>
-      <text class="privacy-hint">手机号仅用于登录与账号找回，不会展示给其他用户</text>
+      <text wx:if="{{!trialExhausted}}" class="privacy-hint">手机号仅用于登录与账号找回，不会展示给其他用户</text>
 
-      <view class="email-entry" bindtap="onToggleEmailForm">
+      <view wx:if="{{!trialExhausted}}" class="email-entry" bindtap="onToggleEmailForm">
         <view class="email-entry-line"></view>
         <text>{{showEmailForm ? '收起邮箱登录' : '使用邮箱登录或注册'}}</text>
         <view class="email-entry-line"></view>
       </view>
 
-      <view class="email-panel" wx:if="{{showEmailForm}}">
+      <view class="email-panel" wx:if="{{showEmailForm && !trialExhausted}}">
         <view class="auth-segmented">
           <view class="segment-btn {{isLogin ? 'active' : ''}}" bindtap="switchMode" data-mode="login">
             <text>邮箱登录</text>

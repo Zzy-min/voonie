@@ -1,0 +1,17 @@
+<view class="voonie-page voonie-page--no-tab storage-page">
+  <view class="storage-header" style="padding-top:{{statusBarHeight}}px"><view class="storage-nav" style="height:{{navBarHeight}}px;padding-right:{{navRightPadding}}px"><view class="back" bindtap="onBack" aria-role="button" aria-label="返回">‹</view><text>本机存储</text></view></view>
+  <scroll-view class="storage-scroll" scroll-y>
+    <view class="card"><text class="label">已统计的本机文件</text><text class="total">{{total}}</text><text class="note">统计小程序文件目录中的直接文件，不含微信自身缓存；包含本机各账号文件。下方缓存清理和记录列表仅对应当前账号。</text>
+      <view class="metric"><text>可恢复图片缓存</text><text>{{cache}}</text></view><view class="metric"><text>固定保存图片</text><text>{{fixed}}</text></view><view class="metric"><text>本机录音文件</text><text>{{recordingsSize}}</text></view><view class="metric"><text>日记副本与参考图</text><text>{{draftsSize}}</text></view>
+      <button bindtap="onClean" disabled="{{busy || !scope}}">清理普通图片缓存</button>
+      <text class="note">普通图片缓存预算为60MB，冷启动时优先回收较少使用的副本。固定保存内容、草稿和录音不会自动清理。旧版未登记文件也会保留。</text>
+    </view>
+    <text wx:if="{{error}}" class="error">{{error}}</text>
+    <view class="card"><text class="section-title">固定保存在本机的日记</text><text class="note">可在日记详情选择“保存到本机（含图片）”。服务器副本仍保留，换设备可恢复。</text><text class="empty" wx:if="{{!books.length}}">还没有固定保存的日记</text>
+      <view class="row" wx:for="{{books}}" wx:key="id"><text class="row-title">{{item.title}}</text><text class="note">{{item.ready ? '文字和图片已保存' : '部分图片待下载'}}</text><view class="actions"><button wx:if="{{!item.ready}}" data-id="{{item.id}}" bindtap="onRetry" disabled="{{busy}}">继续下载</button><button data-id="{{item.id}}" bindtap="onUnpin" disabled="{{busy}}">取消固定保存</button></view></view>
+    </view>
+    <view class="card"><text class="section-title">当前账号本机录音</text><text class="note">录音原文件没有云端永久备份。换手机或清除微信数据前，请主动导出。这里只显示能够确认所属账号的录音；旧版未登记文件不会被清理。</text><text class="empty" wx:if="{{!recordings.length}}">没有已登记的本机录音</text>
+      <view class="row" wx:for="{{recordings}}" wx:key="localId"><text class="row-title">{{item.label}}</text><text class="note">{{item.size}}</text><view class="actions"><button data-id="{{item.localId}}" bindtap="onPlay">{{playingId === item.localId ? '停止' : '播放'}}</button><button data-id="{{item.localId}}" bindtap="onExport">导出文件</button></view></view>
+    </view>
+  </scroll-view>
+</view>

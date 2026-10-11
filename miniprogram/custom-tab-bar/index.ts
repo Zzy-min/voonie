@@ -28,7 +28,7 @@ Component({
     /**
      * 各 Tab 页面在 onShow 时显式同步选中状态
      * 验收标准（P0）：
-     * 索引映射：0=首页, 1=日记, 2=萌宠聊天, 3=广场, 4=我的。
+     * 索引映射：0=首页, 1=日记, 2=萌宠聊天, 3=我的。
      * 状态双向写回 this.data.selected 与 app.globalData.activeTab。
      */
     setSelected(index: number | string) {

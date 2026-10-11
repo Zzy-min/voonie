@@ -14,9 +14,7 @@
     "pages/characters/index",
     "pages/account-security/index",
     "pages/feedback/index",
-    "pages/legal/index",
-    "pages/share/index",
-    "pages/square/index"
+    "pages/legal/index"
   ],
   "window": {
     "backgroundTextStyle": "dark",
@@ -38,26 +36,10 @@
     "backgroundColor": "#FAF7F0",
     "borderStyle": "white",
     "list": [
-      {
-        "pagePath": "pages/index/index",
-        "text": "首页"
-      },
-      {
-        "pagePath": "pages/diary-home/index",
-        "text": "日记"
-      },
-      {
-        "pagePath": "pages/pet/index",
-        "text": "萌宠"
-      },
-      {
-        "pagePath": "pages/square/index",
-        "text": "广场"
-      },
-      {
-        "pagePath": "pages/profile/index",
-        "text": "我的"
-      }
+      { "pagePath": "pages/index/index", "text": "首页" },
+      { "pagePath": "pages/diary-home/index", "text": "日记" },
+      { "pagePath": "pages/pet/index", "text": "萌宠" },
+      { "pagePath": "pages/profile/index", "text": "我的" }
     ]
   },
   "permission": {

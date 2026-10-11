@@ -1,5 +1,9 @@
 // utils/api.ts - Voonie 微信小程序 API 客户端
 import { getOfficialCharacter } from "./officialCharacters";
+import { COMMUNITY_ENABLED } from "./featureFlags";
+import { createLocalDiaryStore } from "./localDiaryStore";
+import { createLocalMediaStore } from "./localMediaStore";
+import { readDiaryDraft } from "./draftStorage";
 // 严格复用后端契约，支持 Token 自动刷新与错误友好映射
 //
 // 后端真源（见 docs/pi-briefs/2026-09-05-api-integration.md）：
@@ -20,6 +24,8 @@ const API_BASE_KEY = "voonie_api_base"; // 本地覆盖键，方便开发者工�
 const VOICE_UPLOAD_TIMEOUT_MS = 90000;
 
 const DEVICE_KEY = "voonie_device_id";
+const GUEST_DEVICE_KEY = "voonie_guest_device_id";
+const GUEST_DEVICE_SECRET_KEY = "voonie_guest_device_secret";
 const ACCESS_TOKEN_KEY = "voonie_access_token";
 const REFRESH_TOKEN_KEY = "voonie_refresh_token";
 const ACTIVE_CHARACTER_KEY = "voling_active_character_id";
@@ -44,6 +50,7 @@ export interface UserProfile {
   created_at?: string;
   companion_days?: number;
   wechat_bound?: boolean;
+  guest_generations_remaining?: number | null;
 }
 
 export interface UserPreferences {
@@ -65,8 +72,11 @@ export interface RawComicDiary {
   organized_diary: string;
   emotion: {
     primary_emotion: string;
+    secondary_emotion?: string | null;
     emotion_label_zh: string;
     mood_score: number;
+    emotion_intensity?: number;
+    confidence?: number;
     analysis: string;
   };
   emotion_curve: Array<{ label: string; intensity: number; evidence: string }>;
@@ -119,6 +129,10 @@ export interface DiaryItem {
   summary: string;
   mood: string;
   mood_score?: number;
+  secondary_mood?: string;
+  emotion_intensity?: number;
+  emotion_confidence?: number;
+  companion_note?: string;
   full_content: string;
   created_at: string;
   date_label?: string;
@@ -226,6 +240,58 @@ export function mediaUrl(value?: string | null): string {
 }
 
 const mediaDownloadCache = new Map<string, Promise<string>>();
+import { createPool } from "./asyncPool";
+import { notifySessionChanged } from "./petConversation";
+const mediaPool = createPool(3);
+let sessionRevision = 0;
+let diaryCacheRevision = 0;
+const diaryDetailPending = new Map<string, Promise<DiaryItem>>();
+let diaryListCache: { scope: string; expires: number; data: DiaryItem[] } | null = null;
+let diaryListPending: { key: string; promise: Promise<DiaryItem[]> } | null = null;
+export const localDiaryStore = createLocalDiaryStore(wx);
+export const localMediaStore = createLocalMediaStore(wx);
+const activeMediaPaths = new Set<string>();
+export function trimLocalImageCache(all = false): { removed: number; remaining: number } {
+  mediaDownloadCache.clear();
+  return localMediaStore.trim(getSessionScope(), all ? 0 : undefined, Array.from(activeMediaPaths));
+}
+const diaryListeners = new Set<(id?: string) => void>();
+const diaryRefreshAt = new Map<string, number>();
+const diarySyncLabels = new Map<string, string>();
+export function subscribeDiaryUpdates(listener: (id?: string) => void): () => void {
+  diaryListeners.add(listener); return () => diaryListeners.delete(listener);
+}
+function notifyDiaryUpdate(scope: string, id?: string) {
+  setTimeout(() => { if (scope === getSessionScope()) diaryListeners.forEach((listener) => listener(id)); }, 0);
+}
+export function diarySyncLabel(): string { return diarySyncLabels.get(getSessionScope()) || ""; }
+function recoverableReadError(error: any): boolean {
+  if (error.code === "stale_session") return false;
+  return !error.status || error.status === 408 || error.status === 429 || error.status >= 500;
+}
+
+export function getSessionScope(): string {
+  return getAccessToken() ? wx.getStorageSync("voling_session_user") || "" : "";
+}
+
+export function invalidateDiaryCache() {
+  diaryCacheRevision += 1;
+  diaryDetailPending.clear();
+  diaryListCache = null;
+  diaryListPending = null;
+  diaryRefreshAt.clear();
+}
+
+function setSessionUser(id: string) {
+  if (id !== wx.getStorageSync("voling_session_user")) {
+    sessionRevision += 1;
+    invalidateDiaryCache();
+    mediaDownloadCache.clear();
+    wx.setStorageSync("voling_session_user", id);
+    notifySessionChanged();
+    notifyDiaryUpdate(id);
+  }
+}
 
 function mediaCachePath(url: string): string {
   let hash = 2166136261;
@@ -243,70 +309,117 @@ function mediaCachePath(url: string): string {
  * wx.request 携带当前会话读取二进制，再把本地文件路径交给 image。
  * 使用 request 是因为真机对 downloadFile 另有独立的合法域名白名单。
  */
-export function authenticatedMediaUrl(
-  value?: string | null,
-  retry = true,
-  networkAttempt = 0
-): Promise<string> {
+export function authenticatedMediaUrl(value?: string | null, force = false): Promise<string> {
   const url = mediaUrl(value);
   if (!url || !/^https?:\/\//i.test(url)) return Promise.resolve(url);
-
-  const cached = mediaDownloadCache.get(url);
-  if (cached) return cached;
-
-  const download = new Promise<string>((resolve, reject) => {
-    const token = getAccessToken();
-    wx.request({
-      url,
-      header: token ? { Authorization: `Bearer ${token}` } : {},
-      responseType: "arraybuffer",
-      success: async (res) => {
-        if (res.statusCode >= 200 && res.statusCode < 300 && res.data) {
-          const filePath = mediaCachePath(url);
-          wx.getFileSystemManager().writeFile({
-            filePath,
-            data: res.data as ArrayBuffer,
-            success: () => resolve(filePath),
-            fail: (err) => reject(new ApiError(0, "media_cache_failed", err.errMsg || "插图缓存失败")),
-          });
-          return;
+  const scope = getSessionScope(), version = sessionRevision;
+  const key = `${scope}:${url}`;
+  if (force) mediaDownloadCache.delete(key);
+  const cached = mediaDownloadCache.get(key);
+  if (cached) { localMediaStore.touch(scope, url); return cached; }
+  const filePath = mediaCachePath(key);
+  const current = () => scope === getSessionScope() && version === sessionRevision;
+  const download = (async () => {
+    if (!scope) throw new ApiError(401, "unauthorized", "请先建立登录会话");
+    const started = Date.now();
+    try {
+      if (force) throw new Error("reload");
+      await new Promise<void>((resolve, reject) => wx.getFileSystemManager().access({ path: filePath, success: () => resolve(), fail: reject }));
+      if (typeof wx.getImageInfo === "function") await new Promise<void>((resolve, reject) => wx.getImageInfo({ src: filePath, success: () => resolve(), fail: reject }));
+      if (!current()) throw new ApiError(0, "stale_session", "账号已切换");
+      localMediaStore.register(scope, url, filePath, 0, isPinnedMedia(scope, url));
+      return filePath;
+    } catch (error) {
+      if (!current()) throw error;
+    }
+    // A fixed full image also works as a cover when its optional thumbnail is absent.
+    const fullUrl = url.replace(/([?&])thumbnail=true(?:&|$)/, "$1").replace(/[?&]$/, "");
+    if (fullUrl !== url && localMediaStore.has(scope, fullUrl)) {
+      const full = localMediaStore.entries(scope).find((item: any) => item.url === fullUrl);
+      if (full) return full.path;
+    }
+    let refreshed = false;
+    for (let attempt = 0; attempt <= MAX_SAFE_NETWORK_RETRIES; attempt++) {
+      if (!current()) throw new ApiError(0, "stale_session", "账号已切换");
+      try {
+        const res: any = await mediaPool(() => new Promise((resolve, reject) => {
+          if (!current()) { reject(new ApiError(0, "stale_session", "账号已切换")); return; }
+          wx.request({ url, header: { Authorization: `Bearer ${getAccessToken()}` }, responseType: "arraybuffer", timeout: 25000, success: resolve, fail: reject });
+        }));
+        if (!current()) throw new ApiError(0, "stale_session", "账号已切换");
+        if (res.statusCode === 401 && !refreshed) {
+          refreshed = true;
+          if (await refreshSession()) { attempt--; continue; }
         }
-        if (res.statusCode === 401 && retry && await refreshSession()) {
-          mediaDownloadCache.delete(url);
-          try {
-            resolve(await authenticatedMediaUrl(value, false, networkAttempt));
-          } catch (error) {
-            reject(error);
-          }
-          return;
-        }
-        reject(new ApiError(res.statusCode, "media_download_failed", "插图加载失败"));
-      },
-      fail: (err) => {
-        const rawMessage = err.errMsg || "";
-        const isDomainError = /domain|合法域名|not in domain list/i.test(rawMessage);
-        if (!isDomainError && networkAttempt < MAX_SAFE_NETWORK_RETRIES) {
-          mediaDownloadCache.delete(url);
-          setTimeout(async () => {
-            try {
-              resolve(await authenticatedMediaUrl(value, retry, networkAttempt + 1));
-            } catch (retryError) {
-              reject(retryError);
-            }
-          }, retryDelay(networkAttempt));
-          return;
-        }
-        reject(new ApiError(
-          0,
-          isDomainError ? "request_domain_not_configured" : "network_error",
-          isDomainError ? "服务器域名尚未生效，请更新小程序版本后重试" : rawMessage || "插图加载失败"
-        ));
-      },
-    });
-  });
-  mediaDownloadCache.set(url, download);
-  download.catch(() => mediaDownloadCache.delete(url));
+        if (res.statusCode < 200 || res.statusCode >= 300) throw new ApiError(res.statusCode, "media_download_failed", "插图加载失败，点按重试");
+        activeMediaPaths.add(filePath);
+        const fs = wx.getFileSystemManager();
+        const temporary = `${filePath}.part`;
+        const atomic = typeof fs.rename === "function";
+        await new Promise<void>((resolve, reject) => fs.writeFile({ filePath: atomic ? temporary : filePath, data: res.data as ArrayBuffer, success: () => resolve(), fail: reject }));
+        if (atomic) await new Promise<void>((resolve, reject) => fs.rename({ oldPath: temporary, newPath: filePath, success: () => resolve(), fail: reject }));
+        if (typeof wx.getImageInfo === "function") await new Promise<void>((resolve, reject) => wx.getImageInfo({ src: filePath, success: () => resolve(), fail: reject }));
+        if (!current()) throw new ApiError(0, "stale_session", "账号已切换");
+        localMediaStore.register(scope, url, filePath, res.data.byteLength, isPinnedMedia(scope, url));
+        console.info("voling.performance", { stage: "media", ms: Date.now() - started });
+        return filePath;
+      } catch (error: any) {
+        if (!current() || attempt === MAX_SAFE_NETWORK_RETRIES || (error.status && error.status < 500) || /domain|合法域名/i.test(error.errMsg || "")) throw error;
+        await new Promise((resolve) => setTimeout(resolve, retryDelay(attempt)));
+      }
+    }
+    throw new ApiError(0, "media_download_failed", "插图加载失败");
+  })().finally(() => { activeMediaPaths.delete(filePath); });
+  mediaDownloadCache.set(key, download);
+  download.catch(() => { if (mediaDownloadCache.get(key) === download) mediaDownloadCache.delete(key); });
   return download;
+}
+
+export function thumbnailUrl(url?: string | null): string {
+  if (!url) return "";
+  return `${url}${url.includes("?") ? "&" : "?"}thumbnail=true`;
+}
+
+function diaryImageUrls(diary: DiaryItem): string[] {
+  return [...(diary.reference_images || []).map((item) => item.image_url), ...(diary.panels || []).map((item) => item.image_url || "")].filter(Boolean).map((url) => mediaUrl(url));
+}
+function isPinnedMedia(scope: string, url: string): boolean {
+  const state = localDiaryStore.snapshot(scope);
+  return Object.keys(state.pins).some((id) => state.items[id] && diaryImageUrls(state.items[id]).includes(url));
+}
+function reconcileMediaPins(scope: string) {
+  const entries = localMediaStore.entries(scope);
+  localMediaStore.pin(scope, entries.filter((item: any) => isPinnedMedia(scope, item.url)).map((item: any) => item.url), true);
+  localMediaStore.pin(scope, entries.filter((item: any) => !isPinnedMedia(scope, item.url)).map((item: any) => item.url), false);
+}
+export async function saveDiaryOffline(id: string): Promise<void> {
+  const scope = getSessionScope();
+  const diary = await getDiaryDetail(id);
+  if (!scope || scope !== getSessionScope()) throw new ApiError(0, "stale_session", "账号已切换");
+  if (!localDiaryStore.save(scope, diary) || !localDiaryStore.pin(scope, id, true)) throw new ApiError(0, "local_storage_full", "本机保存失败，请检查空间");
+  const urls = diaryImageUrls(diary);
+  // Pin as downloads complete as well, so failed partial saves remain protected.
+  await Promise.all(urls.map((url) => authenticatedMediaUrl(url)));
+  if (scope !== getSessionScope()) throw new ApiError(0, "stale_session", "账号已切换");
+  if (!localMediaStore.pin(scope, urls, true)) throw new ApiError(0, "local_storage_full", "图片已下载，但保存标记失败，请重试");
+  if (!isDiaryOfflineSaved(id)) throw new ApiError(0, "local_storage_full", "本机图片保存未完成，请检查空间后重试");
+}
+export function unpinOfflineDiary(id: string) {
+  const scope = getSessionScope(), diary = localDiaryStore.get(scope, id);
+  if (!localDiaryStore.pin(scope, id, false)) throw new ApiError(0, "local_storage_full", "保存设置失败");
+  if (diary) localMediaStore.pin(scope, diaryImageUrls(diary).filter((url) => !isPinnedMedia(scope, url)), false);
+}
+export function isDiaryOfflineSaved(id: string): boolean {
+  const scope = getSessionScope(), diary = localDiaryStore.get(scope, id);
+  return Boolean(diary && localDiaryStore.isPinned(scope, id) && diaryImageUrls(diary).every((url) => localMediaStore.has(scope, url)));
+}
+export function registerLocalRecording(path: string, localId: string, entryDate: string) {
+  const scope = getSessionScope();
+  if (!scope || !path.startsWith(`${wx.env.USER_DATA_PATH}/voice-`) || path.includes("/../")) return;
+  try {
+    const key = `voling_recordings:${scope}`, recordings = wx.getStorageSync(key) || [];
+    wx.setStorageSync(key, [...recordings.filter((item: any) => item.localId !== localId), { path, localId, entryDate }]);
+  } catch { /* The recording and its draft remain available even if indexing fails. */ }
 }
 
 export function getDeviceId(): string {
@@ -324,13 +437,27 @@ export function getAccessToken(): string {
 }
 
 export function setTokens(access: string, refresh?: string) {
-  if (access) wx.setStorageSync(ACCESS_TOKEN_KEY, access);
+  if (access) {
+    wx.setStorageSync(ACCESS_TOKEN_KEY, access);
+    try {
+      const raw = access.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+      const bytes = new Uint8Array(wx.base64ToArrayBuffer(raw));
+      const claims = JSON.parse(Array.from(bytes).map((byte) => String.fromCharCode(byte)).join(""));
+      if (claims.sub) setSessionUser(claims.sub);
+    } catch { /* /auth/me establishes the scope for non-JWT development tokens. */ }
+  }
   if (refresh) wx.setStorageSync(REFRESH_TOKEN_KEY, refresh);
 }
 
 export function clearTokens() {
   wx.removeStorageSync(ACCESS_TOKEN_KEY);
   wx.removeStorageSync(REFRESH_TOKEN_KEY);
+  wx.removeStorageSync("voling_session_user");
+  sessionRevision += 1;
+  invalidateDiaryCache();
+  mediaDownloadCache.clear();
+  notifySessionChanged();
+  notifyDiaryUpdate("");
 }
 
 export function ensureIdempotencyKey(): string {
@@ -339,8 +466,7 @@ export function ensureIdempotencyKey(): string {
 }
 
 export function diaryDraftKey(): string {
-  const app = getApp<any>();
-  const userId = app && app.globalData && app.globalData.currentUser && app.globalData.currentUser.id;
+  const userId = getSessionScope();
   return userId ? `voonie_diary_draft:${userId}` : "voonie_diary_draft";
 }
 
@@ -392,6 +518,7 @@ export async function ensureSession(): Promise<boolean> {
 }
 
 export async function refreshSession(): Promise<boolean> {
+  const revision = sessionRevision;
   const refreshToken = wx.getStorageSync(REFRESH_TOKEN_KEY);
   if (!refreshToken) return false;
 
@@ -406,8 +533,9 @@ export async function refreshSession(): Promise<boolean> {
       return true;
     }
     return false;
-  } catch {
-    clearTokens();
+  } catch (error) {
+    if (recoverableReadError(error)) throw error;
+    if (revision === sessionRevision) clearTokens();
     return false;
   }
 }
@@ -423,12 +551,53 @@ export async function loginUser(email: string, password: string): Promise<any> {
 
 export async function loginWithWeChatCode(code: string): Promise<any> {
   // 微信官方登录：后端用 code 换 openid 并签发 JWT（session_key 不下发）
+  const previousUserId = getApp<any>()?.globalData?.currentUser?.id as string | undefined;
   const res: any = await request("/api/v1/auth/wechat", {
     method: "POST",
     data: { code },
   });
   setTokens(res.access_token, res.refresh_token);
+  if (previousUserId && res.user_id && previousUserId !== res.user_id) {
+    const oldKey = `voonie_diary_draft:${previousUserId}`;
+    const targetKey = `voonie_diary_draft:${res.user_id}`;
+    const previousDraft = wx.getStorageSync(oldKey);
+    if (previousDraft && (previousDraft.text || previousDraft.audioPath)) {
+      const targetDraft = wx.getStorageSync(targetKey);
+      if (!targetDraft || (!targetDraft.text && !targetDraft.audioPath)) {
+        wx.setStorageSync(targetKey, previousDraft);
+      } else {
+        wx.setStorageSync(`voonie_pending_guest_draft:${res.user_id}`, previousDraft);
+      }
+    }
+  }
   return res;
+}
+
+export async function startGuestSession(): Promise<UserProfile> {
+  if (getAccessToken()) {
+    const existing = await getCurrentUser();
+    if (existing) {
+      if (!existing.wechat_bound && existing.guest_generations_remaining === 0) {
+        throw new ApiError(403, "wechat_login_required_after_trial", "游客体验已用完，请使用微信登录");
+      }
+      return existing;
+    }
+  }
+  let deviceId = wx.getStorageSync(GUEST_DEVICE_KEY) as string;
+  if (!deviceId) {
+    deviceId = `mp-guest-${Math.random().toString(36).slice(2, 12)}-${Date.now()}`;
+    wx.setStorageSync(GUEST_DEVICE_KEY, deviceId);
+  }
+  const deviceSecret = wx.getStorageSync(GUEST_DEVICE_SECRET_KEY) as string;
+  const result: any = await request("/api/v1/auth/device", {
+    method: "POST",
+    data: { device_id: deviceId, device_secret: deviceSecret || undefined, app_version: "1.0.2" },
+  });
+  if (result.device_secret) wx.setStorageSync(GUEST_DEVICE_SECRET_KEY, result.device_secret);
+  setTokens(result.access_token, result.refresh_token);
+  const user = await getCurrentUser();
+  if (!user) throw new ApiError(401, "guest_session_failed", "游客体验暂不可用，请稍后重试");
+  return user;
 }
 
 export interface IdentityStatus {
@@ -481,7 +650,10 @@ export async function registerUser(
 
 export async function getCurrentUser(): Promise<UserProfile | null> {
   try {
-    return await request<UserProfile>("/api/v1/auth/me");
+    const user = await request<UserProfile>("/api/v1/auth/me");
+    setSessionUser(user.id);
+    try { wx.setStorageSync(`voling_profile:${user.id}`, user); } catch {}
+    return user;
   } catch (err) {
     // 仅确认的鉴权失效代表“未登录”；断网/超时/服务端错误必须上抛，
     // 让启动页保留现有凭证并展示可恢复的网络错误。
@@ -491,6 +663,12 @@ export async function getCurrentUser(): Promise<UserProfile | null> {
     }
     throw err;
   }
+}
+
+export function getSavedUser(): UserProfile | null {
+  const scope = getSessionScope();
+  if (!scope) return null;
+  try { const user = wx.getStorageSync(`voling_profile:${scope}`); return user?.id === scope ? user : null; } catch { return null; }
 }
 
 export async function logoutUser(): Promise<void> {
@@ -508,7 +686,7 @@ export async function getPreferences(): Promise<UserPreferences> {
 }
 
 export async function updatePreferences(payload: Partial<Pick<UserPreferences, "nickname" | "quote" | "quote_note" | "memory_opt_in">>): Promise<UserPreferences> {
-  return await request<UserPreferences>("/api/v1/me/preferences", { method: "PATCH", data: payload });
+  return await request<UserPreferences>("/api/v1/me/preferences", { method: "PUT", data: payload });
 }
 
 export function getActiveCharacterId(): string {
@@ -522,8 +700,35 @@ export function getActiveCharacterId(): string {
 }
 
 export async function deleteAccountData(): Promise<void> {
+  const scope = getSessionScope();
   await request("/api/v1/me/data", { method: "DELETE" });
+  if (scope !== getSessionScope()) throw new ApiError(0, "stale_session", "账号已切换");
+  // Do not erase other accounts' offline copies or legacy files with unknown ownership.
+  const cleared = localDiaryStore.clear(scope);
+  localMediaStore.pin(scope, localMediaStore.entries(scope).map((item: any) => item.url), false);
+  const mediaRemaining = localMediaStore.trim(scope, 0).remaining;
+  wx.removeStorageSync(`voling_profile:${scope}`);
+  wx.removeStorageSync(`voling_pet_chat:${scope}`);
+  let localCleared = cleared && mediaRemaining === 0;
+  const recordingKey = `voling_recordings:${scope}`, draftKey = `voonie_diary_draft:${scope}`;
+  const recordings = wx.getStorageSync(recordingKey);
+  const draft = readDiaryDraft(draftKey);
+  const paths = new Set<string>((Array.isArray(recordings) ? recordings : []).map((item: any) => item.path));
+  if (draft.audioPath) paths.add(draft.audioPath);
+  for (const reference of draft.references || []) if (reference.path) paths.add(reference.path);
+  const fs = wx.getFileSystemManager();
+  for (const path of paths) {
+    if (typeof path !== "string" || !["voice-", "reference-"].some((prefix) => path.startsWith(`${wx.env.USER_DATA_PATH}/${prefix}`)) || path.includes("/../")) continue;
+    try { fs.accessSync(path); } catch { continue; }
+    try { fs.unlinkSync(path); } catch { localCleared = false; }
+  }
+  // Remove only scoped draft metadata; unknown/shared legacy media remain untouched.
+  const draftPath = `${wx.env.USER_DATA_PATH}/draft-${encodeURIComponent(draftKey).replace(/%/g, "_")}.json`;
+  try { fs.accessSync(draftPath); try { fs.unlinkSync(draftPath); } catch { localCleared = false; } } catch {}
+  const keys = wx.getStorageInfoSync().keys.filter((key) => key === recordingKey || key === draftKey || key.startsWith(`voonie_diary_edit_draft:${scope}:`));
+  for (const key of keys) wx.removeStorageSync(key);
   clearTokens();
+  if (!localCleared) throw new ApiError(0, "local_storage_full", "云端账号已注销，但部分本机文件清除失败，请清除本小程序数据");
 }
 
 export async function submitFeedback(payload: {
@@ -558,6 +763,10 @@ export async function createCharacter(payload: {
 
 export async function deleteCharacter(characterId: string): Promise<void> {
   await request(`/api/v1/characters/${encodeURIComponent(characterId)}`, { method: "DELETE" });
+}
+
+export async function deleteCharacterReference(characterId: string, referenceId: string): Promise<void> {
+  await request(`/api/v1/characters/${encodeURIComponent(characterId)}/references/${encodeURIComponent(referenceId)}`, { method: "DELETE" });
 }
 
 export async function uploadCharacterReference(characterId: string, filePath: string, retry = true): Promise<CharacterReference> {
@@ -657,11 +866,12 @@ export async function uploadVoiceFile(
           }
         } else if (res.statusCode === 401 && retry) {
           if (!refreshPromise) {
-            refreshPromise = refreshSession().catch(() => false).finally(() => {
+            refreshPromise = refreshSession().finally(() => {
               refreshPromise = null;
             });
           }
-          const refreshed = await refreshPromise;
+          let refreshed: boolean;
+          try { refreshed = await refreshPromise; } catch (error) { reject(error); return; }
           if (refreshed) {
             try {
               finishResolve(await uploadVoiceFile(tempFilePath, localId, metadata, false, networkAttempt));
@@ -737,7 +947,8 @@ export async function createComicJob(
   entryId: string,
   idempotencyKey = ensureIdempotencyKey(),
   characterId = getActiveCharacterId(),
-  reference?: { filePath?: string; type: "subject" | "style" | "scene" | "tone" | "combined"; id?: string }
+  reference?: { filePath?: string; type: "subject" | "style" | "scene" | "tone" | "combined"; id?: string; ids?: string[] },
+  generation?: { stylePreset?: "chibi_manga" | "warm_watercolor" | "anime_cel" | "retro_comic"; aspectRatio?: "1:1" | "4:3" | "3:4" }
 ): Promise<{ job_id: string; status: string }> {
   const official = characterId.startsWith("official:")
     ? getOfficialCharacter(characterId)
@@ -771,8 +982,13 @@ export async function createComicJob(
     };
   }
   if (reference?.id) referenceData.reference_id = reference.id;
-  const data = Object.assign({}, characterData || {}, referenceData);
-  return await request<{ job_id: string; status: string }>(
+  const data = Object.assign({}, characterData || {}, referenceData, {
+    style_preset_override: generation?.stylePreset,
+    aspect_ratio: generation?.aspectRatio || "4:3",
+    reference_ids: reference?.ids,
+  });
+  try {
+    return await request<{ job_id: string; status: string }>(
     `/api/v1/entries/${entryId}/comic-jobs`,
     {
       method: "POST",
@@ -780,6 +996,17 @@ export async function createComicJob(
       header: { "Idempotency-Key": idempotencyKey },
     }
   );
+  } catch (error: any) {
+    if (error.status && error.status < 500) throw error;
+    const recovered = await findJobByKey(idempotencyKey).catch(() => null);
+    if (recovered) return { job_id: recovered.job_id, status: recovered.status };
+    throw error;
+  }
+}
+
+export async function findJobByKey(key: string): Promise<JobStatus | null> {
+  try { return await request<JobStatus>(`/api/v1/jobs/by-key/${encodeURIComponent(key)}`); }
+  catch (error: any) { if (error.status === 404) return null; throw error; }
 }
 
 export async function getJobStatus(jobId: string): Promise<JobStatus> {
@@ -793,12 +1020,13 @@ export async function retryJob(jobId: string): Promise<{ job_id: string }> {
 export async function uploadDiaryReference(
   entryId: string,
   filePath: string,
-  options: { type: "subject" | "style" | "scene" | "tone" | "combined"; includeInContent: boolean; paragraphAnchor?: string },
+  options: { type: "subject" | "style" | "scene" | "tone" | "combined"; includeInContent: boolean; paragraphAnchor?: string; onProgress?: (percent: number) => void },
   retry = true
 ): Promise<{ id: string; image_url: string }> {
   const token = getAccessToken();
+  const revision = sessionRevision;
   return await new Promise((resolve, reject) => {
-    wx.uploadFile({
+    const task = wx.uploadFile({
       url: `${getApiBase()}/api/v1/entries/${encodeURIComponent(entryId)}/references`,
       filePath,
       name: "image_file",
@@ -809,15 +1037,20 @@ export async function uploadDiaryReference(
       },
       header: { Authorization: token ? `Bearer ${token}` : "" },
       success: async (res) => {
+        if (revision !== sessionRevision) { reject(new ApiError(0, "stale_session", "账号已切换")); return; }
         if (res.statusCode >= 200 && res.statusCode < 300) {
           try { resolve(JSON.parse(res.data as string)); }
           catch { reject(new ApiError(res.statusCode, "parse_error", "参考图上传结果解析失败")); }
           return;
         }
-        if (res.statusCode === 401 && retry && await refreshSession()) {
-          try { resolve(await uploadDiaryReference(entryId, filePath, options, false)); }
-          catch (error) { reject(error); }
-          return;
+        if (res.statusCode === 401 && retry) {
+          try {
+            if (await refreshSession()) {
+              if (revision !== sessionRevision) throw new ApiError(0, "stale_session", "账号已切换");
+              resolve(await uploadDiaryReference(entryId, filePath, options, false));
+              return;
+            }
+          } catch (error) { reject(error); return; }
         }
         let message = "参考图上传失败，请重试";
         try { message = JSON.parse(res.data as string)?.error?.message || message; } catch {}
@@ -825,6 +1058,7 @@ export async function uploadDiaryReference(
       },
       fail: () => reject(new ApiError(0, "network_error", "参考图上传失败，请检查网络")),
     });
+    if (task.onProgressUpdate && options.onProgress) task.onProgressUpdate((event) => options.onProgress!(event.progress));
   });
 }
 
@@ -888,7 +1122,50 @@ export class JobCanceledError extends Error {
 }
 
 // /api/v1/diaries → 真实 list[ComicGenerationResponse]，mapDiary 统一为 DiaryItem
-export async function listDiaries(): Promise<DiaryItem[]> {
+export async function listDiaries(force = false): Promise<DiaryItem[]> {
+  const scope = getSessionScope();
+  if (!scope) throw new ApiError(401, "unauthorized", "请先建立登录会话");
+  const local = localDiaryStore.list(scope) as DiaryItem[] | null;
+  if (!force && diaryListCache?.scope === scope && diaryListCache.expires > Date.now()) return diaryListCache.data;
+  if (!force && local !== null) {
+    if (Date.now() - (diaryRefreshAt.get(`${scope}:list`) || 0) >= 30000) {
+      diarySyncLabels.set(scope, "已显示本机副本，正在同步");
+      refreshDiaries(scope).catch(() => { /* A local copy remains usable. */ });
+    }
+    return local;
+  }
+  try { return await refreshDiaries(scope); }
+  catch (error) {
+    if (scope === getSessionScope() && local !== null && recoverableReadError(error)) return local;
+    throw error;
+  }
+}
+
+function refreshDiaries(scope: string): Promise<DiaryItem[]> {
+  const version = diaryCacheRevision;
+  const key = `${scope}:${version}`;
+  if (diaryListPending?.key === key) return diaryListPending.promise;
+  diaryRefreshAt.set(`${scope}:list`, Date.now());
+  const promise = fetchDiaryList().then((data) => {
+    if (scope !== getSessionScope() || version !== diaryCacheRevision) throw new ApiError(0, "stale_session", "页面数据已更新，请重试");
+    diaryListCache = { scope, expires: Date.now() + 30000, data };
+    const saved = localDiaryStore.saveList(scope, data);
+    if (saved) reconcileMediaPins(scope);
+    diarySyncLabels.set(scope, saved ? "" : "已同步，本机保存失败；请检查可用空间");
+    notifyDiaryUpdate(scope);
+    return data;
+  }).catch((error) => {
+    if (scope === getSessionScope() && version === diaryCacheRevision) {
+      diarySyncLabels.set(scope, recoverableReadError(error) ? "当前显示本机副本，联网后同步" : "同步未完成，请检查登录状态");
+      notifyDiaryUpdate(scope);
+    }
+    throw error;
+  }).finally(() => { if (diaryListPending?.promise === promise) diaryListPending = null; });
+  diaryListPending = { key, promise };
+  return promise;
+}
+
+async function fetchDiaryList(): Promise<DiaryItem[]> {
   const raw = await request<RawComicDiary[]>("/api/v1/diaries");
   if (Array.isArray(raw)) {
     return raw.map(mapDiary);
@@ -902,52 +1179,118 @@ export async function listDiaries(): Promise<DiaryItem[]> {
   return [];
 }
 
-export async function getDiaryDetail(id: string): Promise<DiaryItem> {
-  const raw = await request<RawComicDiary>(`/api/v1/diaries/${id}`);
-  return mapDiary(raw);
+export async function getDiaryDetail(id: string, force = false): Promise<DiaryItem> {
+  const scope = getSessionScope();
+  if (!scope) throw new ApiError(401, "unauthorized", "请先建立登录会话");
+  const local = localDiaryStore.get(scope, id) as DiaryItem | null;
+  if (!force && local) {
+    if (Date.now() - (diaryRefreshAt.get(`${scope}:${id}`) || 0) >= 30000) {
+      diarySyncLabels.set(scope, "已显示本机副本，正在同步");
+      refreshDiaryDetail(id).catch(() => {});
+    }
+    return local;
+  }
+  try { return await refreshDiaryDetail(id); }
+  catch (error) {
+    if (local && scope === getSessionScope() && recoverableReadError(error)) return local;
+    throw error;
+  }
+}
+
+function refreshDiaryDetail(id: string): Promise<DiaryItem> {
+  const scope = getSessionScope(), version = diaryCacheRevision;
+  const key = `${scope}:${version}:${id}`;
+  const pending = diaryDetailPending.get(key);
+  if (pending) return pending;
+  diaryRefreshAt.set(`${scope}:${id}`, Date.now());
+  const promise = request<RawComicDiary>(`/api/v1/diaries/${encodeURIComponent(id)}`).then((raw) => {
+    if (scope !== getSessionScope() || version !== diaryCacheRevision) throw new ApiError(0, "stale_session", "页面数据已更新");
+    const diary = mapDiary(raw);
+    const previous = localDiaryStore.get(scope, id);
+    const saved = localDiaryStore.save(scope, diary);
+    diarySyncLabels.set(scope, saved ? "" : "已同步，本机保存失败；请检查可用空间");
+    if (JSON.stringify(previous) !== JSON.stringify(diary)) notifyDiaryUpdate(scope, id);
+    return diary;
+  }).catch((error) => {
+    if (scope === getSessionScope() && version === diaryCacheRevision) {
+      if (error.status === 404) {
+        invalidateDiaryCache();
+        localDiaryStore.remove(scope, id);
+        reconcileMediaPins(scope);
+      }
+      diarySyncLabels.set(scope, recoverableReadError(error) ? "当前显示本机副本，联网后同步" : "同步未完成，请检查登录状态");
+      notifyDiaryUpdate(scope, id);
+    }
+    throw error;
+  }).finally(() => { if (diaryDetailPending.get(key) === promise) diaryDetailPending.delete(key); });
+  diaryDetailPending.set(key, promise);
+  return promise;
 }
 
 export async function updateDiary(
   id: string,
   payload: { title: string; content: string; expected_version: number }
 ): Promise<DiaryItem> {
-  const raw = await request<RawComicDiary>(`/api/v1/diaries/${id}`, { method: "PATCH", data: payload });
-  return mapDiary(raw);
+  const scope = getSessionScope();
+  const raw = await request<RawComicDiary>(`/api/v1/diaries/${id}`, { method: "PUT", data: payload });
+  if (scope !== getSessionScope()) throw new ApiError(0, "stale_session", "账号已切换");
+  invalidateDiaryCache();
+  const diary = mapDiary(raw);
+  localDiaryStore.save(scope, diary); notifyDiaryUpdate(scope, id);
+  return diary;
 }
 
 export async function deleteDiary(id: string): Promise<void> {
+  const scope = getSessionScope();
   await request(`/api/v1/diaries/${id}`, { method: "DELETE" });
+  if (scope !== getSessionScope()) throw new ApiError(0, "stale_session", "账号已切换");
+  invalidateDiaryCache();
+  const removed = localDiaryStore.remove(scope, id);
+  if (removed) reconcileMediaPins(scope);
+  notifyDiaryUpdate(scope);
+  if (!removed) throw new ApiError(0, "local_storage_full", "云端日记已删除，但本机副本清除失败，请检查本机空间");
 }
 
 export async function publishShare(payload: {
   artifact_id: string; caption: string; tags?: string[]; show_location?: boolean;
   hide_date?: boolean; is_public?: boolean;
 }): Promise<SharePost> {
+  assertCommunityEnabled();
   return await request<SharePost>("/api/v1/shares", { method: "POST", data: payload });
 }
 
+function assertCommunityEnabled(): void {
+  if (!COMMUNITY_ENABLED) throw new Error("公开社区功能暂未开放");
+}
+
 export async function listShares(order: "recommend" | "latest" = "recommend"): Promise<SharePost[]> {
+  assertCommunityEnabled();
   return await request<SharePost[]>(`/api/v1/shares?order=${order}`);
 }
 
 export async function getPublicShareDetail(postId: string): Promise<PublicShareDetail> {
+  assertCommunityEnabled();
   return await request<PublicShareDetail>(`/api/v1/shares/${postId}`);
 }
 
 export async function toggleShareReaction(postId: string, kind: "like" | "collect"):
 Promise<{ active: boolean; count: number }> {
+  assertCommunityEnabled();
   return await request(`/api/v1/shares/${postId}/reactions/${kind}`, { method: "PUT" });
 }
 
 export async function updateShareVisibility(postId: string, isPublic: boolean): Promise<SharePost> {
-  return await request<SharePost>(`/api/v1/shares/${postId}`, { method: "PATCH", data: { is_public: isPublic } });
+  assertCommunityEnabled();
+  return await request<SharePost>(`/api/v1/shares/${postId}`, { method: "PUT", data: { is_public: isPublic } });
 }
 
 export async function deleteShare(postId: string): Promise<void> {
+  assertCommunityEnabled();
   await request(`/api/v1/shares/${postId}`, { method: "DELETE" });
 }
 
 export async function reportShare(postId: string, reason: string, detail?: string): Promise<{ submitted: boolean }> {
+  assertCommunityEnabled();
   return await request(`/api/v1/shares/${postId}/reports`, { method: "POST", data: { reason, detail } });
 }
 
@@ -1048,9 +1391,13 @@ function mapDiary(raw: RawComicDiary): DiaryItem {
     id: raw.job_id || raw.task_id || "",
     entry_id: raw.entry_id || raw.task_id || "",
     title: raw.title || "未命名手帐",
-    summary: raw.companion_note || moodLabel,
+    summary: emotion.analysis || moodLabel,
     mood: moodLabel,
     mood_score: typeof emotion.mood_score === "number" ? emotion.mood_score : undefined,
+    secondary_mood: emotion.secondary_emotion || undefined,
+    emotion_intensity: typeof emotion.emotion_intensity === "number" ? emotion.emotion_intensity : undefined,
+    emotion_confidence: typeof emotion.confidence === "number" ? emotion.confidence : undefined,
+    companion_note: raw.companion_note || undefined,
     // 编辑、分享和广场都只使用日记正文，不混入 Vonnie 回答或情绪分析。
     full_content: organized,
     created_at: raw.created_at || "",
@@ -1094,7 +1441,7 @@ function retryDelay(attempt: number): number {
 async function request<T = any>(
   path: string,
   options: {
-    method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
+    method?: "GET" | "POST" | "PUT" | "DELETE";
     data?: any;
     header?: Record<string, string>;
     timeout?: number;
@@ -1104,6 +1451,8 @@ async function request<T = any>(
   networkAttempt = 0
 ): Promise<T> {
   const url = `${getApiBase()}${path}`;
+  const revision = sessionRevision;
+  const started = Date.now();
   const token = getAccessToken();
   const deviceId = getDeviceId();
 
@@ -1123,6 +1472,8 @@ async function request<T = any>(
       header: headers,
       timeout: options.timeout ?? 25000,
       success: async (res) => {
+        if (revision !== sessionRevision) { reject(new ApiError(0, "stale_session", "账号已切换")); return; }
+        console.info("voling.performance", { stage: "request", ms: Date.now() - started, status: res.statusCode });
         if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(res.data as T);
         } else if (
@@ -1134,6 +1485,7 @@ async function request<T = any>(
           // Idempotency-Key 的安全写入，避免发布等非幂等请求被重复提交。
           setTimeout(async () => {
             try {
+              if (revision !== sessionRevision) throw new ApiError(0, "stale_session", "账号已切换");
               resolve(await request<T>(path, options, retry, true, networkAttempt + 1));
             } catch (retryErr) {
               reject(retryErr);
@@ -1141,11 +1493,13 @@ async function request<T = any>(
           }, retryDelay(networkAttempt));
         } else if (res.statusCode === 401 && retry) {
           if (!refreshPromise) {
-            refreshPromise = refreshSession().catch(() => false).finally(() => {
+            refreshPromise = refreshSession().finally(() => {
               refreshPromise = null;
             });
           }
-          const refreshed = await refreshPromise;
+          let refreshed: boolean;
+          try { refreshed = await refreshPromise; } catch (error) { reject(error); return; }
+          if (revision !== sessionRevision) { reject(new ApiError(0, "stale_session", "账号已切换")); return; }
           if (refreshed) {
             try {
               const retryRes = await request<T>(path, options, false, networkRetry, networkAttempt);
@@ -1170,6 +1524,7 @@ async function request<T = any>(
         }
       },
       fail: (err) => {
+        if (revision !== sessionRevision) { reject(new ApiError(0, "stale_session", "账号已切换")); return; }
         const rawMessage = err.errMsg || "";
         const isDomainError = /domain|合法域名|not in domain list/i.test(rawMessage);
         if (
@@ -1179,6 +1534,7 @@ async function request<T = any>(
         ) {
           setTimeout(async () => {
             try {
+              if (revision !== sessionRevision) throw new ApiError(0, "stale_session", "账号已切换");
               resolve(await request<T>(path, options, retry, true, networkAttempt + 1));
             } catch (retryErr) {
               reject(retryErr);

@@ -25,6 +25,11 @@ def _ark_error_code(response: httpx.Response) -> str:
     return str(body.get("code") or "") if isinstance(body, dict) else ""
 
 
+def image_data_url(data: bytes) -> str:
+    mime = "image/jpeg" if data.startswith(b"\xff\xd8\xff") else "image/png"
+    return f"data:{mime};base64,{base64.b64encode(data).decode('ascii')}"
+
+
 class ImageProvider(Protocol):
     async def generate(
         self,
@@ -32,6 +37,7 @@ class ImageProvider(Protocol):
         *,
         ref_image: bytes | None,
         seed: int | None,
+        ref_images: list[bytes] | None = None,
     ) -> bytes: ...
 
 
@@ -42,8 +48,9 @@ class MockImageProvider:
         *,
         ref_image: bytes | None,
         seed: int | None,
+        ref_images: list[bytes] | None = None,
     ) -> bytes:
-        material = prompt.encode("utf-8") + (ref_image or b"") + str(seed).encode("ascii")
+        material = prompt.encode("utf-8") + (ref_image or b"") + b"".join(ref_images or []) + str(seed).encode("ascii")
         digest = hashlib.sha256(material).digest()
         background = tuple(210 + component % 40 for component in digest[:3])
         accent = tuple(60 + component % 140 for component in digest[3:6])
@@ -69,7 +76,10 @@ class OpenAIImageProvider:
         *,
         ref_image: bytes | None,
         seed: int | None,
+        ref_images: list[bytes] | None = None,
     ) -> bytes:
+        if ref_images:
+            raise ValueError("This image provider cannot transmit reference images; use the configured Ark provider")
         enhanced_prompt = prompt
         if ref_image is not None:
             enhanced_prompt = f"{prompt}\n[Reference character and scene details provided in diary context]"
@@ -119,6 +129,7 @@ class ArkImageProvider:
         *,
         ref_image: bytes | None,
         seed: int | None,
+        ref_images: list[bytes] | None = None,
     ) -> bytes:
         async def execute(client: httpx.AsyncClient) -> bytes:
             payload: dict[str, object] = {
@@ -130,9 +141,11 @@ class ArkImageProvider:
                 "sequential_image_generation": "disabled",
                 "stream": False,
             }
-            if ref_image is not None:
+            images = ([ref_image] if ref_image is not None else []) + (ref_images or [])
+            if images:
                 payload["image"] = [
-                    f"data:image/png;base64,{base64.b64encode(ref_image).decode('ascii')}"
+                    image_data_url(image)
+                    for image in images
                 ]
             try:
                 response = await request_with_retry(

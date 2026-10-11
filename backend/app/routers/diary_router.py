@@ -10,6 +10,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from voonie.backend.app.api.deps import get_current_user
+from voonie.backend.app.api.content_review import review_embedded_reference, review_text
+from voonie.backend.app.services.guest_generation_limit import require_guest_generation_slot
 from voonie.backend.app.api.deps import TEST_USER_ID
 from voonie.backend.app.db.models import Base, DiaryArtifact, DiaryEntry, DiaryReference, Job, Panel, User
 from voonie.backend.app.db.session import get_db
@@ -86,7 +88,9 @@ def compatibility_response(job: Job, entry: DiaryEntry | None = None) -> ComicGe
         entry_date=utc_isoformat(entry.entry_date) if entry else None,
         timezone=entry.timezone if entry else None,
         updated_at=user_edit.get("updated_at") or (job.updated_at.isoformat() if job.updated_at else None),
-        reference_images=[job.request_json["reference_image"]] if job.request_json.get("reference_image") else [],
+        reference_images=job.request_json.get("reference_images") or (
+            [job.request_json["reference_image"]] if job.request_json.get("reference_image") else []
+        ),
     )
 
 
@@ -105,6 +109,8 @@ async def run_compat_job(
     request: Request, db: AsyncSession, user: User, payload: dict, key: str | None
 ) -> Job | JSONResponse:
     user_id = user.id
+    await review_text(request, user, "\n".join(str(payload.get(key) or "") for key in ("text", "custom_style")))
+    await review_embedded_reference(request, user, payload.get("ref_image_b64"))
     # Some legacy tests instantiate TestClient without entering its lifespan.
     if request.app.state.settings.TESTING:
         async with request.app.state.db_engine.begin() as connection:
@@ -125,6 +131,7 @@ async def run_compat_job(
         request.app.state.settings.COMIC_HOURLY_LIMIT,
         commit=False,
     )
+    await require_guest_generation_slot(db, user)
     job = Job(user_id=user_id, type="comic", request_json=payload, idempotency_key=key)
     db.add(job)
     try:
@@ -217,10 +224,12 @@ async def get_diary(
     return compatibility_response(job, await diary_entry_for_job(job, db))
 
 
+@router.put("/{job_id}", response_model=ComicGenerationResponse)
 @router.patch("/{job_id}", response_model=ComicGenerationResponse)
 async def edit_diary(
     job_id: str,
     payload: DiaryEditRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -240,6 +249,7 @@ async def edit_diary(
             "message": "Diary was edited on another device",
             "current_version": current_version,
         })
+    await review_text(request, current_user, f"{payload.title}\n{payload.content}")
     result["user_edit"] = {
         "title": payload.title,
         "content": payload.content,
@@ -347,6 +357,7 @@ async def regenerate_panel(
         custom_style,
         ref_image=identity_reference,
         character_bible=snapshot.get("bible"),
+        review_openid=current_user.wechat_openid,
     )
     storyboard_panel.image_url = request.app.state.storage.get_file_url(image_path)
 

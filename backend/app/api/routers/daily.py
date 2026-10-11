@@ -8,11 +8,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from voonie.backend.app.api.deps import get_current_user
+from voonie.backend.app.api.content_review import review_text
 from voonie.backend.app.core.exceptions import ApiError
 from voonie.backend.app.core.timeutils import day_bounds
 from voonie.backend.app.db.models import DailyDiary, DailyDiaryEntry, DiaryArtifact, DiaryEntry, Job, User
 from voonie.backend.app.db.session import get_db
 from voonie.backend.app.models.schemas import CharacterConfig
+from voonie.backend.app.services.guest_generation_limit import require_guest_generation_slot
 from voonie.backend.app.schemas.daily import DailyDiaryResponse, DailyDiaryUpdate, DailyJobQueued
 from voonie.backend.app.workers.storybook_job import execute_storybook_job, page_count_for
 
@@ -130,6 +132,7 @@ async def create_summary(
         return await serialize_daily(db, daily)
     text = "\n".join(item.redacted_text for item in entries)
     analysis = await request.app.state.diary_analyzer.analyze(text)
+    await review_text(request, current_user, analysis.summary)
     daily.summary = analysis.summary
     daily.title = analysis.summary[:40]
     daily.emotion_arc_json = [analysis.emotion.label]
@@ -149,10 +152,12 @@ async def create_summary(
 async def update_daily(
     diary_date: date,
     body: DailyDiaryUpdate,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     timezone_name: str = Query(default="UTC", alias="timezone"),
 ) -> DailyDiaryResponse:
+    await review_text(request, current_user, "\n".join(part for part in (body.title, body.summary) if part))
     daily = await get_or_create_daily(db, current_user.id, diary_date, timezone_name)
     if body.title is not None:
         daily.title = body.title
@@ -181,6 +186,7 @@ async def create_storybook_job(
     await request.app.state.rate_limiter.consume(
         db, current_user.id, "comic", request.app.state.settings.COMIC_HOURLY_LIMIT, commit=False
     )
+    await require_guest_generation_slot(db, current_user)
     daily.status = "generating"
     job = Job(
         user_id=current_user.id,

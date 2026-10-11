@@ -17,7 +17,8 @@
         <text class="hero-title">今天过得怎么样？</text>
         <text class="hero-subtitle">告诉 Vonnie，慢慢说就好。</text>
       </view>
-      <image class="hero-vonnie voonie-mascot anim-breathe" src="/assets/images/voonie/voonie-sit.png" mode="aspectFit" bindtap="onDogTap" />
+      <image class="hero-vonnie voonie-mascot anim-breathe" src="/assets/images/voonie/voonie-sit.png" mode="aspectFit" bindtap="onDogTap" aria-role="button" aria-label="和 Vonnie 聊天" />
+      <text class="hero-chat-hint" bindtap="openChat">点点 Vonnie，聊一会儿</text>
       <view wx:if="{{showHeart}}" class="heart-burst">♡</view>
       <button class="primary-record" bindtap="onStartRecord">
         <image src="/assets/icons/icon-mic.svg" mode="aspectFit" />
@@ -56,3 +57,4 @@
     </view>
   </scroll-view>
 </view>
+<pet-chat-drawer id="petChatDrawer" wx:if="{{chatVisible}}" visible="{{chatVisible}}" bind:close="closeChat" />

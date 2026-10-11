@@ -1,22 +1,26 @@
 import {
   CharacterItem,
+  authenticatedMediaUrl,
   createCharacter,
   deleteCharacter,
+  deleteCharacterReference,
   getActiveCharacterId,
+  getSessionScope,
   listCharacters,
-  mediaUrl,
   setActiveCharacterId,
   uploadCharacterReference,
 } from "../../utils/api";
 import { getNavInfo } from "../../utils/nav";
 import { OFFICIAL_CHARACTERS } from "../../utils/officialCharacters";
+import { enableHomeShareMenu, homeShareHandlers } from "../../utils/homeShare";
 
 Page({
+  ...homeShareHandlers,
   data: {
     statusBarHeight: 20,
     navBarHeight: 44,
     navRightPadding: 96,
-    characters: [] as Array<CharacterItem & { cover: string; initial: string }>,
+    characters: [] as Array<CharacterItem & { cover: string; initial: string; references: Array<CharacterItem["references"][number] & { url: string; imageFailed?: boolean }> }>,
     activeId: "",
     loading: true,
     loadError: false,
@@ -28,9 +32,11 @@ Page({
     officialCharacters: OFFICIAL_CHARACTERS,
     showCreate: false,
     deletingId: "",
+    deletingReferenceId: "",
   },
 
   onLoad() {
+    enableHomeShareMenu();
     const nav = getNavInfo();
     this.setData({
       statusBarHeight: nav.statusBarHeight,
@@ -42,16 +48,24 @@ Page({
   },
 
   async loadCharacters() {
+    const scope = getSessionScope();
     this.setData({ loading: true, loadError: false });
     try {
       const rows = await listCharacters();
-      const characters = rows.map((item) => ({
-        ...item,
-        cover: item.references.length ? mediaUrl(item.references[0].media_key) : "",
-        initial: item.name ? item.name.slice(0, 1) : "角",
+      const characters = await Promise.all(rows.map(async (item) => {
+        const references = await Promise.all(item.references.map(async (reference) => {
+          try {
+            return { ...reference, url: await authenticatedMediaUrl(reference.media_key), imageFailed: false };
+          } catch {
+            return { ...reference, url: "", imageFailed: true };
+          }
+        }));
+        return { ...item, references, cover: references[0]?.url || "", initial: item.name ? item.name.slice(0, 1) : "角" };
       }));
+      if (scope !== getSessionScope()) return;
       this.setData({ characters, loading: false, loadError: false });
     } catch (error) {
+      if (scope !== getSessionScope()) return;
       this.setData({ loading: false, loadError: true });
     }
   },
@@ -141,10 +155,80 @@ Page({
     });
   },
 
+  onPreviewReference(e: WechatMiniprogram.BaseEvent) {
+    const character = this.data.characters.find((item) => item.id === e.currentTarget.dataset.id);
+    const reference = character?.references.find((item) => item.id === e.currentTarget.dataset.referenceId);
+    if (!character || !reference?.url || reference.imageFailed) return;
+    wx.previewImage({ current: reference.url, urls: character.references.filter((item) => item.url && !item.imageFailed).map((item) => item.url) });
+  },
+
+  onReferenceError(e: WechatMiniprogram.BaseEvent) {
+    const id = e.currentTarget.dataset.id;
+    const referenceId = e.currentTarget.dataset.referenceId;
+    const characters = this.data.characters.map((item) => {
+      if (item.id !== id) return item;
+      const references = item.references.map((reference) => reference.id === referenceId ? { ...reference, url: "", imageFailed: true } : reference);
+      return { ...item, references, cover: references[0]?.url || "" };
+    });
+    this.setData({ characters });
+  },
+
+  async onRetryReference(e: WechatMiniprogram.BaseEvent) {
+    const id = e.currentTarget.dataset.id;
+    const referenceId = e.currentTarget.dataset.referenceId;
+    const character = this.data.characters.find((item) => item.id === id);
+    const reference = character?.references.find((item) => item.id === referenceId);
+    if (!reference) return;
+    const scope = getSessionScope();
+    try {
+      const url = await authenticatedMediaUrl(reference.media_key, true);
+      if (scope !== getSessionScope()) return;
+      const characters = this.data.characters.map((item) => {
+        if (item.id !== id) return item;
+        const references = item.references.map((ref) => ref.id === referenceId ? { ...ref, url, imageFailed: false } : ref);
+        return { ...item, references, cover: references[0]?.url || "" };
+      });
+      this.setData({ characters });
+    } catch (error: any) {
+      if (scope === getSessionScope()) wx.showToast({ title: error?.message || "参考图暂时无法加载", icon: "none" });
+    }
+  },
+
+  onDeleteReference(e: WechatMiniprogram.BaseEvent) {
+    const id = e.currentTarget.dataset.id || "";
+    const referenceId = e.currentTarget.dataset.referenceId || "";
+    const character = this.data.characters.find((item) => item.id === id);
+    if (!character?.references.some((item) => item.id === referenceId) || this.data.deletingReferenceId || this.data.deletingId) return;
+    wx.showModal({
+      title: "删除这张参考图？",
+      content: "仅删除所选参考图，角色名称、外貌设定和已生成的日记都会保留。",
+      confirmText: "删除",
+      confirmColor: "#B75B4B",
+      success: async (result) => {
+        if (!result.confirm || this.data.deletingReferenceId || this.data.deletingId) return;
+        this.setData({ deletingReferenceId: referenceId });
+        try {
+          await deleteCharacterReference(id, referenceId);
+          const characters = this.data.characters.map((item) => {
+            if (item.id !== id) return item;
+            const references = item.references.filter((reference) => reference.id !== referenceId);
+            return { ...item, references, cover: references[0]?.url || "", version: item.version + 1 };
+          });
+          this.setData({ characters });
+          wx.showToast({ title: "参考图已删除", icon: "success" });
+        } catch (error: any) {
+          wx.showToast({ title: error?.message || "参考图删除失败", icon: "none" });
+        } finally {
+          this.setData({ deletingReferenceId: "" });
+        }
+      },
+    });
+  },
+
   onDeleteCharacter(e: WechatMiniprogram.BaseEvent) {
     const id = e.currentTarget.dataset.id || "";
     const character = this.data.characters.find((item) => item.id === id);
-    if (!id || !character || this.data.deletingId) return;
+    if (!id || !character || this.data.deletingId || this.data.deletingReferenceId) return;
     wx.showModal({
       title: `删除“${character.name}”？`,
       content: "角色和已上传的参考图将被删除。已经生成的日记不会受到影响。",

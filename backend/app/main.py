@@ -10,7 +10,7 @@ from pathlib import Path
 import httpx
 from arq import create_pool
 from arq.connections import RedisSettings
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -33,6 +33,7 @@ from voonie.backend.app.services.memory_service import MemoryService
 from voonie.backend.app.services.rate_limiter import RateLimiter
 from voonie.backend.app.services.pet_agent import PetCompanionAgent
 from voonie.backend.app.services.job_recovery import recover_interrupted_jobs
+from voonie.backend.app.services.content_review import ContentReview
 from voonie.backend.app.db.models import Base, Character, CharacterReference, DiaryArtifact, DiaryReference, Panel, User
 from voonie.backend.app.db.session import get_db
 
@@ -60,6 +61,7 @@ def build_lifespan(app_settings: Settings):
                 )
         http_client = httpx.AsyncClient()
         app.state.http_client = http_client
+        app.state.content_review = ContentReview(app_settings, http_client)
         if not app_settings.ARQ_INLINE:
             try:
                 redis_settings = RedisSettings.from_dsn(app_settings.REDIS_URL)
@@ -97,6 +99,7 @@ def create_app(app_settings: Settings | None = None) -> FastAPI:
     app.state.redis = None
     app.state.arq_pool = None
     app.state.inline_tasks = set()
+    app.state.inline_job_semaphore = asyncio.Semaphore(2)
     app.state.storage = StorageService(app_settings)
     app.state.storyboard_agent = StoryboardAgent(app_settings=app_settings)
     app.state.image_service = ImageGenService(app_settings=app_settings, storage=app.state.storage)
@@ -179,6 +182,7 @@ def create_app(app_settings: Settings | None = None) -> FastAPI:
     @app.get("/media/{filename}", name="media")
     async def serve_private_media(
         filename: str,
+        thumbnail: bool = False,
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db),
     ):
@@ -212,6 +216,13 @@ def create_app(app_settings: Settings | None = None) -> FastAPI:
         media_path = app_settings.TEMP_MEDIA_DIR / filename
         if not media_path.is_file():
             raise ApiError(404, "media_not_found", "Media not found")
+        if thumbnail:
+            # Ownership is checked above for every request, including thumbnails.
+            try:
+                data = await asyncio.to_thread(app.state.storage.thumbnail, media_path)
+            except (OSError, ValueError):
+                raise ApiError(422, "invalid_image", "This media has no image thumbnail")
+            return Response(content=data, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=300"})
         return FileResponse(str(media_path))
 
     assets_dir = LEGACY_WEB_DIR / "assets"

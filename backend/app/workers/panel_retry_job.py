@@ -4,7 +4,7 @@ import asyncio
 
 from sqlalchemy import select, update
 
-from voonie.backend.app.db.models import DiaryArtifact, Job, Panel
+from voonie.backend.app.db.models import DiaryArtifact, Job, Panel, User
 from voonie.backend.app.models.schemas import CharacterConfig, ComicPanel, Storyboard
 from voonie.backend.app.workers.comic_job import update_job
 
@@ -20,6 +20,7 @@ async def execute_panel_retry_job(context: dict, job_id: str) -> None:
         if claimed.rowcount != 1:
             return
         job = await session.get(Job, job_id)
+        owner = await session.get(User, job.user_id)
         request_data = dict(job.request_json)
         artifact = await session.get(DiaryArtifact, request_data["artifact_id"])
         panel = await session.scalar(
@@ -41,6 +42,7 @@ async def execute_panel_retry_job(context: dict, job_id: str) -> None:
             character_name=snapshot.get("character_name", "我"),
             appearance_prompt=snapshot.get("appearance_prompt", CharacterConfig().appearance_prompt),
             style_preset=snapshot.get("style_preset", "chibi_manga"),
+            visual_identity=snapshot.get("visual_identity", "human"),
         )
         sibling = await session.scalar(
             select(Panel).where(
@@ -61,6 +63,7 @@ async def execute_panel_retry_job(context: dict, job_id: str) -> None:
             None,
             ref_image=identity_reference,
             character_bible=snapshot.get("bible"),
+            review_openid=owner.wechat_openid if owner else None,
         )
         storyboard_panel.image_url = context["storage"].get_file_url(image_path)
         async with session_factory() as session:

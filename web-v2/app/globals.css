@@ -3269,6 +3269,70 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visib
   max-width: none;
 }
 
+.calendar-month-navigation {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.calendar-month-arrow {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(222, 190, 173, 0.72);
+  border-radius: 50%;
+  background: #fffaf7;
+  color: #8a4f36;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.calendar-month-arrow:hover {
+  background: #f8e6dc;
+  color: #5a3021;
+  transform: translateY(-1px);
+}
+
+.calendar-period-picker {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #522f21;
+}
+
+.calendar-period-picker select {
+  appearance: none;
+  border: 0;
+  border-bottom: 1px solid rgba(182, 90, 56, 0.32);
+  border-radius: 0;
+  background: transparent;
+  color: #522f21;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.5;
+  cursor: pointer;
+  padding: 3px 18px 3px 3px;
+  background-image: linear-gradient(45deg, transparent 50%, #a46247 50%), linear-gradient(135deg, #a46247 50%, transparent 50%);
+  background-position: calc(100% - 9px) 50%, calc(100% - 5px) 50%;
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+}
+
+.calendar-period-picker select:focus-visible,
+.calendar-month-arrow:focus-visible {
+  outline: 2px solid rgba(182, 90, 56, 0.5);
+  outline-offset: 3px;
+}
+
+.calendar-period-picker strong {
+  font-size: 16px;
+  white-space: nowrap;
+}
+
 .memory-page-header,
 .memory-feed,
 .memory-intro-row,
@@ -4999,8 +5063,29 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visib
   }
 
   .calendar-header-row {
-    align-items: flex-start;
+    align-items: stretch;
+    flex-direction: column;
     gap: 8px;
+  }
+
+  .calendar-month-navigation {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .calendar-period-picker {
+    gap: 4px;
+  }
+
+  .calendar-period-picker select,
+  .calendar-period-picker strong {
+    font-size: 15px;
+  }
+
+  .calendar-month-arrow {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
   }
 
   .calendar-header-row h3 {

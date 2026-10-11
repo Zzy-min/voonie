@@ -1,7 +1,9 @@
 import { bindPhoneIdentity, bindWeChatIdentity, deleteAccountData, getIdentityStatus, IdentityStatus } from "../../utils/api";
 import { getNavInfo } from "../../utils/nav";
+import { enableHomeShareMenu, homeShareHandlers } from "../../utils/homeShare";
 
 Page({
+  ...homeShareHandlers,
   data: {
     statusBarHeight: 20,
     navBarHeight: 44,
@@ -14,6 +16,7 @@ Page({
   },
 
   onLoad(options: Record<string, string>) {
+    enableHomeShareMenu();
     const nav = getNavInfo();
     this.setData({
       statusBarHeight: nav.statusBarHeight,
@@ -94,7 +97,6 @@ Page({
         this.setData({ action: "delete" });
         try {
           await deleteAccountData();
-          wx.clearStorageSync();
           const app = getApp<any>();
           if (app?.globalData) {
             app.globalData.currentUser = null;

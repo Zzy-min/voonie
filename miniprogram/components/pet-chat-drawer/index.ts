@@ -1,5 +1,5 @@
 // components/pet-chat-drawer/index.ts
-import { chatWithPet } from "../../utils/api";
+import { petSession } from "../../utils/petSession";
 
 Component({
   properties: {
@@ -16,6 +16,12 @@ Component({
     scrollTop: 0,
   },
 
+  lifetimes: {
+    attached() { this.unsubscribeChat = petSession.subscribe((state: any) => this.setData({ ...state, scrollTop: state.messages.length * 200 })); },
+    detached() { this.unsubscribeChat?.(); },
+  },
+  observers: { visible(value: boolean) { if (value) petSession.sync(); } },
+  pageLifetimes: { show() { petSession.sync(); } },
   methods: {
     onClose() {
       this.triggerEvent("close");
@@ -48,7 +54,7 @@ Component({
     onWish() {
       this.onClose();
       wx.navigateTo({
-        url: "/pages/share/index",
+        url: "/pages/record/index",
       });
     },
 
@@ -67,48 +73,10 @@ Component({
     },
 
     async sendMessage(text: string) {
-      const userMsg = {
-        id: "user-" + Date.now(),
-        role: "user" as const,
-        content: text,
-      };
-
-      const curMsgs = Array.isArray(this.data.messages) ? this.data.messages : [];
-      const newMsgs = [...curMsgs, userMsg];
-      this.setData({
-        messages: newMsgs,
-        loading: true,
-        scrollTop: newMsgs.length * 200,
-      });
-
-      try {
-        const res = await chatWithPet(text);
-        const petMsg = {
-          id: "pet-" + Date.now(),
-          role: "pet" as const,
-          content: res.reply || "我在这里，慢慢说。",
-        };
-        const currentList = Array.isArray(this.data.messages) ? this.data.messages : [];
-        const updated = [...currentList, petMsg];
-        this.setData({
-          messages: updated,
-          loading: false,
-          scrollTop: updated.length * 200,
-        });
-      } catch (err: any) {
-        const fallbackMsg = {
-          id: "pet-" + Date.now(),
-          role: "pet" as const,
-          content: "消息没有发送成功。检查网络后再试一次，刚才这条内容还没有交给 Vonnie。",
-        };
-        const currentList = Array.isArray(this.data.messages) ? this.data.messages : [];
-        const updated = [...currentList, fallbackMsg];
-        this.setData({
-          messages: updated,
-          loading: false,
-          scrollTop: updated.length * 200,
-        });
-      }
+      try { await petSession.send(text); }
+      catch (error: any) { wx.showToast({ title: error.message || "发送失败", icon: "none" }); }
     },
+    onRetryMessage(e: WechatMiniprogram.BaseEvent) { petSession.send("", {}, e.currentTarget.dataset.id).catch((error: any) => wx.showToast({ title: error.message, icon: "none" })); },
+    onClearChat() { wx.showModal({ title: "清空聊天记录", content: "清空本机当前账号的聊天记录？", success: (res) => { if (res.confirm) petSession.clear(); } }); },
   },
 });

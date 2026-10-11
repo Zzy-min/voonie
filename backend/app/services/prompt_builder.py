@@ -26,6 +26,7 @@ def character_snapshot(character: CharacterConfig, bible: dict[str, Any] | None 
         "character_name": character.character_name,
         "appearance_prompt": character.appearance_prompt,
         "style_preset": character.style_preset,
+        "visual_identity": character.visual_identity,
         "bible": card,
     }
 
@@ -66,6 +67,19 @@ def build_panel_prompt(
         f"Source-grounded memory: {panel.source_excerpt or panel.anchor_text}. "
         f"Scene change only: {panel.scene_desc}. Action: {panel.character_action}. Shot: {panel.shot_type}. "
     )
+
+    if character.visual_identity == "animal":
+        return (
+            f"{ref_header}Illustrated diary panel. {style_prompt}. "
+            f"The first-person protagonist is {character.appearance_prompt}; depict this animal literally, "
+            "not a person, a human-animal hybrid, or a human with an animal tail. "
+            "Keep its species, color, body shape and illustration style consistent across panels. "
+            "Other people may appear only if the diary explicitly mentions them; keep them secondary "
+            "and do not invent extra people or a different setting. "
+            f"{memory_clause}"
+            f"Negative constraints: {forbidden}. No speech balloons, captions or readable text. "
+            "No human protagonist, hybrid anatomy, extra limbs, watermark or photorealistic collage."
+        )
 
     return (
         f"{ref_header}Comic panel illustration. {style_prompt}. "

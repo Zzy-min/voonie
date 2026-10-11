@@ -1,8 +1,11 @@
 // pages/profile/index.ts
-import { diaryDraftKey, getCurrentUser, getPreferences, logoutUser, listDiaries, updatePreferences } from "../../utils/api";
+import { diaryDraftKey, getAccessToken, getCurrentUser, getPreferences, logoutUser, listDiaries, updatePreferences, getSessionScope, getSavedUser } from "../../utils/api";
 import { getNavInfo } from "../../utils/nav";
+import { COMMUNITY_ENABLED } from "../../utils/featureFlags";
+import { enableHomeShareMenu, homeShareHandlers } from "../../utils/homeShare";
 
 Page({
+  ...homeShareHandlers,
   data: {
     statusBarHeight: 20,
     navBarHeight: 44,
@@ -13,9 +16,11 @@ Page({
     comicCount: 0,
     voiceDays: 0,
     memoryOptIn: true,
+    loggedIn: false,
   },
 
   onLoad() {
+    enableHomeShareMenu();
     const nav = getNavInfo();
     this.setData({
       statusBarHeight: nav.statusBarHeight,
@@ -28,18 +33,28 @@ Page({
   onShow() {
     const app = getApp();
     if (app && app.globalData) {
-      app.globalData.activeTab = 4;
+      app.globalData.activeTab = 3;
     }
     const tab = typeof this.getTabBar === "function" ? this.getTabBar() : null;
     if (tab && typeof tab.setSelected === "function") {
-      tab.setSelected(4);
+      tab.setSelected(3);
     }
     this.loadUserData();
   },
 
   async loadUserData() {
+    const scope = getSessionScope();
+    const loggedIn = Boolean(getAccessToken());
+    this.setData({ loggedIn });
+    const saved = getSavedUser();
+    if (saved) this.setData({ nickname: saved.nickname || "小主人", companionDays: saved.companion_days || 0 });
+    if (!loggedIn) {
+      this.setData({ nickname: "游客", companionDays: 0, diaryCount: 0, comicCount: 0, voiceDays: 0 });
+      return;
+    }
     try {
       const user = await getCurrentUser();
+      if (scope !== getSessionScope()) return;
       if (user) {
         // 用后端 companion_days（真实同伴天数）；缺省回退到 created_at 本地计算，绝不写死 28
         let companion = user.companion_days;
@@ -61,6 +76,7 @@ Page({
 
     try {
       const diaries = await listDiaries();
+      if (scope !== getSessionScope()) return;
       const safeDiaries = Array.isArray(diaries) ? diaries : [];
       const dateSet = new Set<string>();
       let comic = 0;
@@ -82,6 +98,7 @@ Page({
 
     try {
       const preferences = await getPreferences();
+      if (scope !== getSessionScope()) return;
       this.setData({ memoryOptIn: preferences.memory_opt_in });
     } catch (e) {
       console.warn("Load memory preference failed:", e);
@@ -177,11 +194,13 @@ Page({
   },
 
   onNavSquare() {
+    if (!COMMUNITY_ENABLED) return;
     wx.removeStorageSync("voling_square_mine_only");
     wx.switchTab({ url: "/pages/square/index" });
   },
 
   onNavMyShares() {
+    if (!COMMUNITY_ENABLED) return;
     wx.setStorageSync("voling_square_mine_only", true);
     wx.switchTab({ url: "/pages/square/index" });
   },
@@ -194,10 +213,6 @@ Page({
     wx.navigateTo({ url: "/pages/account-security/index" });
   },
 
-  onNavFeedback() {
-    wx.navigateTo({ url: "/pages/feedback/index" });
-  },
-
   onNavPrivacy() {
     wx.navigateTo({ url: "/pages/legal/index?type=privacy" });
   },
@@ -207,6 +222,10 @@ Page({
   },
 
   onLogout() {
+    if (!this.data.loggedIn) {
+      wx.navigateTo({ url: "/pages/auth/index" });
+      return;
+    }
     wx.showModal({
       title: "退出账号",
       content: "确定要退出当前账号吗？",
@@ -236,7 +255,7 @@ Page({
           wx.showToast({ title: "已退出", icon: "success" });
           setTimeout(() => {
             // 重置整个页面栈，防止退出后通过返回手势看到账号缓存页面。
-            wx.reLaunch({ url: "/pages/auth/index" });
+            wx.reLaunch({ url: "/pages/index/index" });
           }, 500);
         }
       },

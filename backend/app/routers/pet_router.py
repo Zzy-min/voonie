@@ -10,15 +10,30 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from voonie.backend.app.api.deps import get_current_user
+from voonie.backend.app.api.content_review import review_text
 from voonie.backend.app.db.models import DiaryArtifact, DiaryEntry, MemoryItem, User
 from voonie.backend.app.db.session import get_db
 from voonie.backend.app.models.schemas import PetChatRequest, PetChatResponse
 from voonie.backend.app.services.pet_agent import PetCompanionAgent
 import logging
+import time
 
 
 router = APIRouter(prefix="/pet", tags=["Pet Companion"])
 retrieval_logger = logging.getLogger("voonie.retrieval")
+
+
+def pet_chat_result(response: PetChatResponse, stream: bool):
+    if not stream:
+        return response
+
+    async def events():
+        for token in response.reply:
+            yield f"event: token\ndata: {json.dumps({'token': token}, ensure_ascii=False)}\n\n"
+        payload = {"pet_action": response.pet_action, "referenced_memories": response.referenced_memories or []}
+        yield f"event: action\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(events(), media_type="text/event-stream")
 
 
 @router.post("/chat")
@@ -29,12 +44,22 @@ async def chat_with_pet(
     db: AsyncSession = Depends(get_db),
 ):
     """与小宠物聊天（自动接入用户账户数据、昵称、最近日记与心情）。"""
+    await review_text(request, current_user, req.message)
     await request.app.state.rate_limiter.consume(
         db,
         current_user.id,
         "chat",
         request.app.state.settings.CHAT_HOURLY_LIMIT,
     )
+
+    history_list = [h.model_dump(mode="json") for h in req.history] if req.history else None
+    scope_started = time.perf_counter()
+    allowed = await request.app.state.pet_agent.allows_message(req.message, history_list)
+    logging.getLogger("voonie.performance").info("pet_scope_ms=%d", int((time.perf_counter() - scope_started) * 1000))
+    if not allowed:
+        response = PetCompanionAgent.scope_refusal()
+        await review_text(request, current_user, response.reply)
+        return pet_chat_result(response, req.stream)
 
     # 1. Real-time Chinese clock context
     now_cn = datetime.now(ZoneInfo("Asia/Shanghai"))
@@ -48,16 +73,18 @@ async def chat_with_pet(
     user_quote = getattr(current_user, "quote", "") or ""
     user_quote_note = getattr(current_user, "quote_note", "") or ""
 
+    needs_memory = bool(current_user.memory_opt_in and PetCompanionAgent.should_retrieve_memory(req.message, [h.model_dump() for h in req.history or []]))
+    query_started = time.perf_counter()
     # 3. Query Total Diaries and Recent Diary Entries & Artifacts
     total_diaries = (
         await db.scalar(
             select(func.count()).select_from(DiaryArtifact).where(DiaryArtifact.user_id == current_user.id)
         )
-    ) or 0
+    ) or 0 if needs_memory else 0
 
     recent_artifacts: list[tuple[DiaryArtifact, DiaryEntry | None]] = []
     recent_entries: list[DiaryEntry] = []
-    if current_user.memory_opt_in:
+    if needs_memory:
         recent_artifacts = list(
             (
                 await db.execute(
@@ -124,7 +151,7 @@ async def chat_with_pet(
     # Client-supplied memory is intentionally ignored because it can be stale, cross-account,
     # or forged and must never be presented to the model as trusted diary history.
     context_items = []
-    should_retrieve = bool(current_user.memory_opt_in and PetCompanionAgent.should_retrieve_memory(req.message))
+    should_retrieve = needs_memory
     retrieval_reason = "memory_disabled" if not current_user.memory_opt_in else "no_history_intent"
     if should_retrieve:
         try:
@@ -133,8 +160,6 @@ async def chat_with_pet(
         except Exception:
             context_items = []
             retrieval_reason = "search_error"
-    history_list = [h.model_dump(mode="json") for h in req.history] if req.history else None
-
     # 在调用外部模型前重新从数据库读取隐私开关，避免并发关闭记忆后仍使用旧 ORM 快照。
     memory_still_enabled = bool(
         await db.scalar(select(User.memory_opt_in).where(User.id == current_user.id))
@@ -155,11 +180,14 @@ async def chat_with_pet(
         "selected_count": len(context_items),
     }, separators=(",", ":")))
 
+    logging.getLogger("voonie.performance").info("pet_query_ms=%d", int((time.perf_counter() - query_started) * 1000))
+    model_started = time.perf_counter()
     response = await request.app.state.pet_agent.chat(
         message=req.message,
         pet_name=req.pet_name or "Voonie",
         pet_type=req.pet_type or "dog",
         user_nickname=nickname,
+        scope_checked=True,
         user_quote=user_quote,
         user_quote_note=user_quote_note,
         time_context=time_context,
@@ -170,19 +198,11 @@ async def chat_with_pet(
         local_memory_context=context_items,
         recent_mood_trend=recent_mood,
     )
-    if not req.stream:
-        return response
-
-    async def events():
-        for token in response.reply:
-            yield f"event: token\ndata: {json.dumps({'token': token}, ensure_ascii=False)}\n\n"
-        payload = {
-            "pet_action": response.pet_action,
-            "referenced_memories": response.referenced_memories or [],
-        }
-        yield f"event: action\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
-
-    return StreamingResponse(events(), media_type="text/event-stream")
+    logging.getLogger("voonie.performance").info("pet_model_ms=%d", int((time.perf_counter() - model_started) * 1000))
+    review_started = time.perf_counter()
+    await review_text(request, current_user, response.reply)
+    logging.getLogger("voonie.performance").info("pet_review_ms=%d", int((time.perf_counter() - review_started) * 1000))
+    return pet_chat_result(response, req.stream)
 
 
 @router.get("/status")

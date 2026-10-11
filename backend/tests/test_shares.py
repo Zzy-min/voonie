@@ -21,7 +21,7 @@ def share_client():
     media_dir = data_dir / f"shares-media-{test_id}"
     app = create_app(Settings(DATABASE_URL=f"sqlite+aiosqlite:///{database_path.as_posix()}",
         JWT_SECRET="share-test-secret-that-is-long-enough", TEMP_MEDIA_DIR=media_dir,
-        ARQ_INLINE=True, TESTING=False))
+        ARQ_INLINE=True, TESTING=False, COMMUNITY_ENABLED=True))
 
     async def create_schema():
         async with app.state.db_engine.begin() as connection:
@@ -57,6 +57,29 @@ def seed_diary(app, user_id: str) -> str:
             await db.commit()
     asyncio.run(seed())
     return job_id
+
+
+def test_community_flag_blocks_public_feed_and_publish(share_client):
+    client, app = share_client
+    headers, owner_id = auth(client, "share-disabled-owner")
+    diary_id = seed_diary(app, owner_id)
+    created = client.post("/api/v1/shares", headers=headers, json={
+        "artifact_id": diary_id, "caption": "旧公开投稿", "is_public": True,
+    })
+    assert created.status_code == 201
+    post_id = created.json()["id"]
+    app.state.settings.COMMUNITY_ENABLED = False
+    assert client.get("/api/v1/shares").status_code == 404
+    assert client.get(f"/api/v1/shares/{post_id}").status_code == 404
+    assert client.post("/api/v1/shares", headers=headers, json={
+        "artifact_id": diary_id, "caption": "不应公开", "is_public": True,
+    }).status_code == 404
+    assert client.patch(f"/api/v1/shares/{post_id}", headers=headers,
+                        json={"is_public": True}).status_code == 404
+    assert client.patch(f"/api/v1/shares/{post_id}", headers=headers,
+                        json={"is_public": False}).status_code == 200
+    assert client.delete(f"/api/v1/shares/{post_id}", headers=headers).status_code == 204
+    assert client.get("/api/v1/entries", headers=headers).status_code == 200
 
 
 def test_private_share_is_hidden_and_public_share_supports_reactions(share_client):

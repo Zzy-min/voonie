@@ -1,4 +1,5 @@
 import time
+import io
 import uuid
 from pathlib import Path
 from voonie.backend.app.core.config import Settings, settings
@@ -20,6 +21,14 @@ class StorageService:
         path = Path(file_path)
         base_url = self.settings.MEDIA_PUBLIC_BASE.rstrip("/")
         return f"{base_url}/media/{path.name}"
+
+    def thumbnail(self, path: Path) -> bytes:
+        from PIL import Image
+        with Image.open(path) as image:
+            image.thumbnail((480, 480), Image.Resampling.LANCZOS)
+            output = io.BytesIO()
+            image.convert("RGB").save(output, format="JPEG", quality=78)
+            return output.getvalue()
 
     def delete(self, file_path: str | Path | None) -> bool:
         if not file_path:

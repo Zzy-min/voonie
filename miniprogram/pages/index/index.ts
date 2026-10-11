@@ -1,8 +1,13 @@
 // pages/index/index.ts
 import { getNavInfo } from "../../utils/nav";
-import { authenticatedMediaUrl, diaryDraftKey, DiaryItem, listDiaries } from "../../utils/api";
+import { getSessionScope, thumbnailUrl, authenticatedMediaUrl, diaryDraftKey, DiaryItem, getAccessToken, listDiaries, localTimezone } from "../../utils/api";
+import { diaryDateKey } from "../../utils/diaryDate";
+import { readDiaryDraft, writeDiaryDraft } from "../../utils/draftStorage";
+import { enableHomeShareMenu, homeShareHandlers } from "../../utils/homeShare";
+import { subscribeDiaryUpdates, diarySyncLabel } from "../../utils/api";
 
 Page({
+  ...homeShareHandlers,
   data: {
     statusBarHeight: 20,
     navBarHeight: 44,
@@ -16,9 +21,12 @@ Page({
     diaryFailed: false,
     todayDiary: null as (DiaryItem & { cover?: string }) | null,
     recentDiary: null as (DiaryItem & { cover?: string }) | null,
+    syncNote: "",
   },
 
   onLoad() {
+    this.stopDiaryUpdates = subscribeDiaryUpdates(() => { this.setData({ syncNote: diarySyncLabel() }); this.loadHomeDiaries(); });
+    enableHomeShareMenu();
     // 隐藏可能残留的全局/前置页遮挡 Toast，保持场景纯净
     if (typeof wx.hideToast === "function") {
       try { wx.hideToast(); } catch (_) {}
@@ -33,6 +41,7 @@ Page({
   },
 
   onShow() {
+    this.updateDateDisplay();
     // 静默清除前置页面或调试工具偶发的遮罩 Toast
     if (typeof wx.hideToast === "function") {
       try { wx.hideToast(); } catch (_) {}
@@ -54,34 +63,56 @@ Page({
     this.loadHomeDiaries();
   },
 
+  homeLoading: false,
+  homeScope: "",
+  homeRevision: 0,
+  onHide() { this.closeChat(); },
+  stopDiaryUpdates: null as null | (() => void),
+  onUnload() { this.homeRevision += 1; this.stopDiaryUpdates?.(); },
+
   async loadHomeDiaries() {
+    const scope = getSessionScope();
+    if (this.homeLoading && this.homeScope === scope) return;
+    const version = ++this.homeRevision;
+    if (this.homeScope !== scope) this.setData({ todayDiary: null, recentDiary: null });
+    this.homeScope = scope;
+    this.homeLoading = true;
+    const started = Date.now();
+    if (!getAccessToken()) {
+      this.setData({
+        diaryLoading: false,
+        diaryFailed: false,
+        todayDiary: null,
+        recentDiary: null,
+      });
+      this.homeLoading = false;
+      return;
+    }
     this.setData({ diaryLoading: true, diaryFailed: false });
     try {
       const diaries = await listDiaries();
       const safe = Array.isArray(diaries) ? diaries : [];
       const now = new Date();
-      const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-      const dateKey = (item: DiaryItem) => {
-        const value = item.entry_date || item.created_at || "";
-        const direct = value.match(/^(\d{4}-\d{2}-\d{2})/);
-        return direct ? direct[1] : "";
-      };
+      const timeZone = localTimezone();
+      const todayKey = diaryDateKey(now.toISOString(), timeZone);
+      const dateKey = (item: DiaryItem) => diaryDateKey(item.entry_date || item.created_at || "", timeZone);
       const today = safe.find((item) => dateKey(item) === todayKey) || null;
       const recent = safe.find((item) => !today || item.id !== today.id) || null;
-      const withCover = async (item: DiaryItem | null) => {
-        if (!item) return null;
-        const first = Array.isArray(item.panels) ? item.panels[0] : null;
-        const cover = first && first.image_url ? await authenticatedMediaUrl(first.image_url) : "";
-        return { ...item, cover };
-      };
-      this.setData({
-        todayDiary: await withCover(today),
-        recentDiary: await withCover(recent),
-        diaryLoading: false,
+      if (version !== this.homeRevision || scope !== getSessionScope()) return;
+      this.setData({ todayDiary: today ? { ...today, cover: "" } : null, recentDiary: recent ? { ...recent, cover: "" } : null, diaryLoading: false, syncNote: diarySyncLabel() });
+      console.info("voling.performance", { stage: "home_text", ms: Date.now() - started });
+      [ { field: "todayDiary", item: today }, { field: "recentDiary", item: recent } ].forEach(async ({ field, item }) => {
+        if (!item?.panels?.[0]?.image_url) return;
+        try {
+          const cover = await authenticatedMediaUrl(thumbnailUrl(item.panels[0].image_url));
+          if (version === this.homeRevision && scope === getSessionScope()) this.setData({ [`${field}.cover`]: cover });
+        } catch { /* Text remains usable if a cover fails. */ }
       });
     } catch (error) {
       console.warn("Load home diaries failed:", error);
-      this.setData({ diaryLoading: false, diaryFailed: true });
+      if (version === this.homeRevision && scope === getSessionScope()) this.setData({ diaryLoading: false, diaryFailed: true });
+    } finally {
+      if (version === this.homeRevision) this.homeLoading = false;
     }
   },
 
@@ -97,6 +128,7 @@ Page({
   },
 
   onDogTap() {
+    this.openChat();
     this.setData({ showHeart: true });
     setTimeout(() => {
       this.setData({ showHeart: false });
@@ -104,10 +136,14 @@ Page({
   },
 
   openChat() {
+    const tab = typeof this.getTabBar === "function" ? this.getTabBar() : null;
+    if (tab && typeof tab.setHidden === "function") tab.setHidden(true);
     this.setData({ chatVisible: true });
   },
 
   closeChat() {
+    const tab = typeof this.getTabBar === "function" ? this.getTabBar() : null;
+    if (tab && typeof tab.setHidden === "function") tab.setHidden(false);
     this.setData({ chatVisible: false });
   },
 
@@ -150,10 +186,13 @@ Page({
       this.onStartRecord();
       return;
     }
-    // 把想说的话投递到发布页，快速写下今日心情/愿望
-    wx.navigateTo({
-      url: `/pages/share/index?text=${encodeURIComponent(text)}`,
-    });
+    const key = diaryDraftKey();
+    const draft = readDiaryDraft(key);
+    if (!writeDiaryDraft(key, { ...draft, text, status: "text-draft", updatedAt: Date.now() })) {
+      wx.showToast({ title: "草稿保存失败，请重试", icon: "none" });
+      return;
+    }
+    wx.navigateTo({ url: "/pages/record/index" });
     this.inputText = "";
   },
 

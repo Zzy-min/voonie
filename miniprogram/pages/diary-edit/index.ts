@@ -1,30 +1,40 @@
-import { ApiError, getDiaryDetail, updateDiary } from "../../utils/api";
+import { ApiError, getDiaryDetail, updateDiary, diarySyncLabel, getSessionScope, subscribeDiaryUpdates } from "../../utils/api";
 import { getNavInfo } from "../../utils/nav";
+import { enableHomeShareMenu, homeShareHandlers } from "../../utils/homeShare";
 
 let draftTimer: number | null = null;
 
 Page({
+  ...homeShareHandlers,
   saveCommitted: false,
+  editScope: "",
+  stopUpdates: null as null | (() => void),
 
   data: {
     statusBarHeight: 20, navBarHeight: 44, navRightPadding: 96,
     diaryId: "", title: "", content: "", editVersion: 0,
     initialTitle: "", initialContent: "", loading: true, saving: false, draftSaved: false,
+    syncNote: "",
   },
 
   async onLoad(options: Record<string, string | undefined>) {
+    this.editScope = getSessionScope();
+    this.stopUpdates = subscribeDiaryUpdates(() => {
+      if (this.editScope !== getSessionScope()) this.setData({ title: "", content: "", initialTitle: "", initialContent: "", loading: false });
+    });
+    enableHomeShareMenu();
     const nav = getNavInfo();
     const diaryId = options.id || "";
     this.setData({ ...nav, diaryId });
     if (!diaryId) { wx.showToast({ title: "日记不存在", icon: "none" }); return; }
     try {
-      const diary = await getDiaryDetail(diaryId);
+      const diary = await getDiaryDetail(diaryId, true);
       const server = { title: diary.title || "", content: diary.full_content || "", editVersion: diary.edit_version || 0 };
       const draft = wx.getStorageSync(this.draftKey()) || null;
       const useDraft = draft && draft.version === server.editVersion;
       this.setData({ ...server, title: useDraft ? draft.title : server.title,
         content: useDraft ? draft.content : server.content, initialTitle: server.title,
-        initialContent: server.content, loading: false, draftSaved: Boolean(useDraft) });
+        initialContent: server.content, loading: false, draftSaved: Boolean(useDraft), syncNote: diarySyncLabel() });
     } catch (error) {
       this.setData({ loading: false });
       wx.showToast({ title: "日记加载失败，请返回重试", icon: "none" });
@@ -32,8 +42,7 @@ Page({
   },
 
   draftKey() {
-    const app = getApp();
-    const userId = app?.globalData?.currentUser?.id || "current-session";
+    const userId = this.editScope;
     return `voonie_diary_edit_draft:${userId}:${this.data.diaryId}`;
   },
 
@@ -45,12 +54,15 @@ Page({
   },
   persistDraft() {
     if (this.saveCommitted || !this.data.diaryId || this.data.loading) return;
-    wx.setStorageSync(this.draftKey(), { title: this.data.title, content: this.data.content,
-      version: this.data.editVersion, savedAt: Date.now() });
-    this.setData({ draftSaved: true });
+    if (!this.editScope || this.editScope !== getSessionScope()) return;
+    try {
+      wx.setStorageSync(this.draftKey(), { title: this.data.title, content: this.data.content,
+        version: this.data.editVersion, savedAt: Date.now() });
+      this.setData({ draftSaved: true });
+    } catch { this.setData({ draftSaved: false }); wx.showToast({ title: "草稿保存失败，请检查本机空间", icon: "none" }); }
   },
   onHide() { this.persistDraft(); },
-  onUnload() { if (!this.data.saving) this.persistDraft(); },
+  onUnload() { if (draftTimer !== null) clearTimeout(draftTimer); draftTimer = null; this.stopUpdates?.(); if (!this.data.saving) this.persistDraft(); },
 
   onCancel() {
     const changed = this.data.title !== this.data.initialTitle || this.data.content !== this.data.initialContent;
@@ -70,6 +82,7 @@ Page({
   },
 
   async onSave() {
+    if (this.editScope !== getSessionScope()) { wx.showToast({ title: "账号已切换，请重新打开日记", icon: "none" }); return; }
     if (this.data.saving) return;
     const title = this.data.title.trim(); const content = this.data.content.trim();
     if (!title) { wx.showToast({ title: "标题不能为空", icon: "none" }); return; }

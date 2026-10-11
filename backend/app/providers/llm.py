@@ -14,6 +14,10 @@ class LLMProvider(Protocol):
 
 class MockLLMProvider:
     async def complete_json(self, system: str, user: str) -> dict:
+        if system.startswith("PET_DIARY_SCOPE_INPUT_V1"):
+            return {"allowed": True, "category": "diary"}
+        if system.startswith("PET_DIARY_SCOPE_OUTPUT_V1"):
+            return {"allowed": True}
         if "pet_action" in system and "referenced_memories" in system:
             return {
                 "reply": "我认真听着呢。先把今天的心情交给我保管一会儿吧。",
@@ -75,6 +79,8 @@ class MockLLMProvider:
             re.S,
         )
         transcript = transcript_match.group(1).strip() if transcript_match else "今天也有值得记住的时刻。"
+        nickname_match = re.search(r"【用户昵称】\s*(.*?)\s*【主人公漫画设定】", user, re.S)
+        nickname = nickname_match.group(1).strip() if nickname_match else "小主人"
         sentences = [item.strip() for item in re.split(r"(?<=[。！？!?])", transcript) if item.strip()]
         if not sentences:
             sentences = [transcript]
@@ -110,7 +116,7 @@ class MockLLMProvider:
                 }
                 for panel_id in range(1, illustration_count + 1)
             ],
-            "companion_note": "你认真生活的样子，已经让今天变得很特别。",
+            "companion_note": f"{nickname}，你认真面对今天的样子，已经很了不起了。",
         }
 
 

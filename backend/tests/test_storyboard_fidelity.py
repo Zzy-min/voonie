@@ -57,3 +57,34 @@ def test_storyboard_never_persists_unverifiable_diary_rewrites():
     )
     assert "搓手" not in storyboard.organized_diary
     assert "面条" not in storyboard.organized_diary
+
+
+class PromptCapturingProvider(InventingProvider):
+    def __init__(self):
+        self.system = ""
+        self.prompt = ""
+
+    async def complete_json(self, system: str, prompt: str) -> dict:
+        self.system = system
+        self.prompt = prompt
+        result = await super().complete_json(system, prompt)
+        result["companion_note"] = "今天开会紧张，但你还是认真走完了这一天。"
+        return result
+
+
+def test_companion_note_addresses_user_not_illustration_character():
+    provider = PromptCapturingProvider()
+    storyboard = asyncio.run(
+        StoryboardAgent(provider=provider).generate_storyboard(
+            "今天上午开会时有点紧张。傍晚看见橙色晚霞，觉得很温暖。",
+            CharacterConfig(character_name="插图主角小夏"),
+            user_nickname="晚霞",
+        )
+    )
+
+    assert "【用户昵称】\n晚霞" in provider.prompt
+    assert "角色名称: 插图主角小夏" in provider.prompt
+    assert "角色名称只服务于插图" in provider.system
+    assert storyboard.companion_note.startswith("晚霞，")
+    assert "开会紧张" in storyboard.companion_note
+    assert "插图主角小夏" not in storyboard.companion_note

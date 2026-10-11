@@ -23,17 +23,10 @@
       <text class="tab-label">萌宠</text>
     </view>
 
-    <view class="tab-item {{selected === 3 ? 'active' : ''}}" data-index="3" data-path="/pages/square/index" bindtap="switchTab">
+    <!-- 4. 我的 -->
+    <view class="tab-item {{selected === 3 ? 'active' : ''}}" data-index="3" data-path="/pages/profile/index" bindtap="switchTab">
       <view class="tab-icon">
-        <image class="tab-icon-img" src="{{selected === 3 ? '/assets/icons/tab-bookshelf-active.svg' : '/assets/icons/tab-bookshelf.svg'}}" mode="aspectFit" />
-      </view>
-      <text class="tab-label">广场</text>
-    </view>
-
-    <!-- 5. 我的 -->
-    <view class="tab-item {{selected === 4 ? 'active' : ''}}" data-index="4" data-path="/pages/profile/index" bindtap="switchTab">
-      <view class="tab-icon">
-        <image class="tab-icon-img" src="{{selected === 4 ? '/assets/icons/tab-profile-active.svg' : '/assets/icons/tab-profile.svg'}}" mode="aspectFit" />
+        <image class="tab-icon-img" src="{{selected === 3 ? '/assets/icons/tab-profile-active.svg' : '/assets/icons/tab-profile.svg'}}" mode="aspectFit" />
       </view>
       <text class="tab-label">我的</text>
     </view>

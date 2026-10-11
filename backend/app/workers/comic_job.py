@@ -1,4 +1,8 @@
 import asyncio
+import base64
+import time
+import httpx
+import logging
 from datetime import datetime, timezone
 from typing import Any
 
@@ -16,6 +20,8 @@ from voonie.backend.app.services.image_gen_service import ImageGenService
 from voonie.backend.app.services.storage_service import StorageService
 from voonie.backend.app.services.storyboard_agent import StoryboardAgent
 from voonie.backend.app.services.prompt_builder import character_snapshot
+from voonie.backend.app.services.visual_subject import resolve_visual_character
+from voonie.backend.app.services.content_review import ContentReview
 from voonie.backend.app.workers.cleanup import cleanup_cron
 from voonie.backend.app.providers.embeddings import get_embedding_provider
 
@@ -50,6 +56,7 @@ async def update_job(
 
 
 async def execute_comic_job(context: dict[str, Any], job_id: str) -> None:
+    started_at = time.perf_counter()
     session_factory = context["session_factory"]
     async with session_factory() as session:
         claimed = await session.execute(
@@ -64,20 +71,56 @@ async def execute_comic_job(context: dict[str, Any], job_id: str) -> None:
         if job is None:
             return
         request_data = dict(job.request_json)
+        queued_at = job.created_at.replace(tzinfo=timezone.utc) if job.created_at.tzinfo is None else job.created_at
+        logging.getLogger("voonie.performance").info("job_queue_ms=%d", max(0, int((datetime.now(timezone.utc) - queued_at).total_seconds() * 1000)))
+        owner = await session.get(User, job.user_id)
+        user_nickname = (owner.nickname or "小主人").strip() if owner else "小主人"
 
     try:
-        character = CharacterConfig.model_validate(request_data.get("character", {}))
+        character = resolve_visual_character(
+            request_data["text"], CharacterConfig.model_validate(request_data.get("character", {}))
+        )
+        aspect_ratio = request_data.get("aspect_ratio", "4:3")
+        custom_style = request_data.get("custom_style")
+        base_style = custom_style or context["image_service"].settings.STYLE_PRESETS.get(
+            character.style_preset,
+            context["image_service"].settings.STYLE_PRESETS["chibi_manga"],
+        )
+        framing_prompt = (
+            f"Canvas aspect ratio {aspect_ratio}. Keep the main character's full head, face, "
+            "and key action completely inside frame with generous safe margins; no cropped head or limbs."
+        )
+        effective_style = f"{base_style}\n{framing_prompt}"
         storyboard = await context["storyboard_agent"].generate_storyboard(
             request_data["text"],
             character,
-            request_data.get("custom_style"),
+            effective_style,
+            user_nickname,
         )
+        if owner and owner.wechat_openid and context["image_service"].settings.CONTENT_REVIEW_ENABLED:
+            async with httpx.AsyncClient() as client:
+                await ContentReview(context["image_service"].settings, client).check_text(
+                    "\n".join([
+                        storyboard.title,
+                        storyboard.organized_diary,
+                        storyboard.companion_note or "",
+                        storyboard.key_quote or "",
+                        *[
+                            " ".join(str(value or "") for value in (
+                                panel.scene_desc, panel.character_action, panel.narration,
+                                panel.speech_bubble.model_dump_json() if panel.speech_bubble else "",
+                                panel.sfx, panel.visual_reason,
+                            ))
+                            for panel in storyboard.panels
+                        ],
+                    ]),
+                    owner.wechat_openid if owner else None,
+                )
 
         ref_image_b64 = request_data.get("ref_image_b64")
         ref_image_bytes = None
-        if ref_image_b64:
+        if ref_image_b64 and character.visual_identity == "human":
             try:
-                import base64
                 data = ref_image_b64.split(",", 1)[-1] if "," in ref_image_b64 else ref_image_b64
                 ref_image_bytes = base64.b64decode(data, validate=True)
             except Exception:
@@ -87,28 +130,58 @@ async def execute_comic_job(context: dict[str, Any], job_id: str) -> None:
             return
         character_bible = request_data.get("character_bible")
         identity_seed = request_data.get("character_seed")
+        reference_images = []
+        reference_types = []
+        for reference in request_data.get("reference_inputs", []):
+            # Human subject photos must not replace an explicitly nonhuman narrator.
+            if character.visual_identity != "human" and reference["type"] == "subject":
+                continue
+            reference_images.append(base64.b64decode(reference["image_b64"], validate=True))
+            reference_types.append("scene" if character.visual_identity != "human" and reference["type"] == "combined" else reference["type"])
 
         async def render_one(index_panel, identity_reference):
+            render_started = time.perf_counter()
             index, panel = index_panel
+            reference_options = {"ref_images": reference_images, "reference_types": reference_types} if reference_images else {}
             image_path, prompt = await context["image_service"].generate_panel_image(
                 panel,
                 character,
-                request_data.get("custom_style"),
+                effective_style,
                 ref_image=identity_reference,
                 character_bible=character_bible,
                 seed=identity_seed,
+                aspect_ratio=aspect_ratio,
+                review_openid=owner.wechat_openid if owner else None,
+                **reference_options,
             )
+            logging.getLogger("voonie.performance").info("panel_render_ms=%d", int((time.perf_counter() - render_started) * 1000))
             panel.image_url = context["storage"].get_file_url(image_path)
             return index, image_path, prompt
 
         indexed_panels = list(enumerate(storyboard.panels, start=1))
         first_rendered = await render_one(indexed_panels[0], ref_image_bytes)
+        if not await update_job(
+            session_factory, job_id, status="running", stage="rendering",
+            progress=0.25 + 0.6 / len(indexed_panels),
+        ):
+            return
         # 后续画面始终复用明确的角色参考；若用户没有上传参考图，就以首图
         # 作为本篇日记的身份锚点，避免每张图独立抽样后更换主人公。
         identity_reference = ref_image_bytes or first_rendered[1].read_bytes()
-        remaining = await asyncio.gather(
-            *[render_one(item, identity_reference) for item in indexed_panels[1:]]
-        )
+        async def render_and_report(item):
+            rendered_panel = await render_one(item, identity_reference)
+            return rendered_panel
+
+        remaining = []
+        for completed in asyncio.as_completed(
+            [render_and_report(item) for item in indexed_panels[1:]]
+        ):
+            remaining.append(await completed)
+            if not await update_job(
+                session_factory, job_id, status="running", stage="rendering",
+                progress=0.25 + 0.6 * (1 + len(remaining)) / len(indexed_panels),
+            ):
+                return
         rendered = [first_rendered, *remaining]
         rendered.sort(key=lambda item: item[0])
         panel_paths = [item[1] for item in rendered]
@@ -194,6 +267,8 @@ async def execute_comic_job(context: dict[str, Any], job_id: str) -> None:
             job.result_json = result
             job.error = None
             owner = await session.get(User, job.user_id)
+            if owner is not None and owner.wechat_openid is None:
+                owner.guest_generated_count += 1
             if owner is not None and owner.memory_opt_in:
                 memory_summary = storyboard.organized_diary[:500]
                 embedding = None
@@ -216,6 +291,7 @@ async def execute_comic_job(context: dict[str, Any], job_id: str) -> None:
                     embedding=embedding,
                 ))
             await session.commit()
+        logging.getLogger("voonie.performance").info("job_total_ms=%d", int((time.perf_counter() - started_at) * 1000))
     except Exception as exc:
         async with session_factory() as session:
             job = await session.get(Job, job_id)
@@ -231,9 +307,34 @@ async def execute_comic_job(context: dict[str, Any], job_id: str) -> None:
 
 async def run_inline_comic_job(context: dict[str, Any], job_id: str) -> None:
     try:
-        await execute_comic_job(context, job_id)
-    except Exception:
-        return
+        async with context["inline_job_semaphore"]:
+            settings = context.get("settings")
+            if settings is None or ":memory:" in settings.DATABASE_URL:
+                await execute_comic_job(context, job_id)
+                return
+
+            # Keep synchronous image processing off the HTTP event loop.
+            def run_in_thread() -> None:
+                async def run() -> None:
+                    engine = create_async_engine(settings.DATABASE_URL)
+                    isolated_context = {
+                        **context,
+                        "session_factory": async_sessionmaker(engine, expire_on_commit=False),
+                    }
+                    try:
+                        await execute_comic_job(isolated_context, job_id)
+                    finally:
+                        await engine.dispose()
+
+                asyncio.run(run())
+
+            await asyncio.to_thread(run_in_thread)
+    except Exception as exc:
+        logging.getLogger("voonie.jobs").exception("inline comic job failed before completion")
+        await update_job(
+            context["session_factory"], job_id, status="failed", stage="failed",
+            progress=0, error=f"{type(exc).__name__}: {exc}", finished=True,
+        )
 
 
 async def generate_comic_job(ctx: dict[str, Any], job_id: str) -> None:

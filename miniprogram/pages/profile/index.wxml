@@ -19,7 +19,8 @@
             <text class="user-nickname">{{nickname}}</text>
             <text class="edit-icon">✎</text>
           </view>
-          <text class="companion-days">Vonnie 陪你记录了 {{companionDays}} 天</text>
+          <text class="companion-days" wx:if="{{loggedIn}}">Vonnie 陪你记录了 {{companionDays}} 天</text>
+          <text class="companion-days" wx:else>先逛一逛，登录后开始收藏日常</text>
         </view>
         <view class="settings-gear-btn" bindtap="onOpenSettings">
           <image class="gear-icon-svg" src="/assets/icons/icon-gear.svg" mode="aspectFit" />
@@ -75,16 +76,11 @@
         <text class="menu-label">我的角色集</text>
         <text class="menu-arrow">›</text>
       </view>
-      <view class="menu-item" bindtap="onNavMyShares">
-        <image class="menu-icon-svg" src="/assets/icons/icon-search.svg" mode="aspectFit" />
-        <text class="menu-label">我的公开分享</text>
-        <text class="menu-arrow">›</text>
-      </view>
-      <view class="menu-item" bindtap="onNavFeedback">
+      <button class="menu-item official-feedback" open-type="feedback" hover-class="none" aria-label="帮助与反馈">
         <image class="menu-icon-svg" src="/assets/icons/icon-help.svg" mode="aspectFit" />
         <text class="menu-label">帮助与反馈</text>
         <text class="menu-arrow">›</text>
-      </view>
+      </button>
       <view class="menu-item" bindtap="onNavPrivacy">
         <image class="menu-icon-svg" src="/assets/icons/icon-lock.svg" mode="aspectFit" />
         <text class="menu-label">隐私政策</text>
@@ -97,7 +93,7 @@
       </view>
       <view class="menu-item logout-item" bindtap="onLogout">
         <image class="menu-icon-svg" src="/assets/icons/icon-logout.svg" mode="aspectFit" />
-        <text class="menu-label">退出当前账号</text>
+        <text class="menu-label">{{loggedIn ? '退出当前账号' : '登录并同步记录'}}</text>
         <text class="menu-arrow">›</text>
       </view>
     </view>

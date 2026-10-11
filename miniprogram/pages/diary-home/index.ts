@@ -1,9 +1,12 @@
 // pages/diary-home/index.ts - 日记 Tab 根页（方案 A：手帐/日记本主页）
 // 案例：Tab「日记」对应翻页手帐/日记本，而不是月历。日历降级为子页入口。
-import { authenticatedMediaUrl, listDiaries, DiaryItem } from "../../utils/api";
+import { getSessionScope, thumbnailUrl, authenticatedMediaUrl, getAccessToken, listDiaries, DiaryItem } from "../../utils/api";
 import { getNavInfo } from "../../utils/nav";
+import { enableHomeShareMenu, homeShareHandlers } from "../../utils/homeShare";
+import { subscribeDiaryUpdates, diarySyncLabel } from "../../utils/api";
 
 Page({
+  ...homeShareHandlers,
   data: {
     statusBarHeight: 20,
     navBarHeight: 44,
@@ -11,16 +14,18 @@ Page({
     loading: true,
     failed: false,
     latest: null as (DiaryItem & { cover?: string }) | null,
+    syncNote: "",
   },
 
   onLoad() {
+    this.stopDiaryUpdates = subscribeDiaryUpdates(() => { this.setData({ syncNote: diarySyncLabel() }); this.loadLatest(); });
+    enableHomeShareMenu();
     const nav = getNavInfo();
     this.setData({
       statusBarHeight: nav.statusBarHeight,
       navBarHeight: nav.navBarHeight,
       navRightPadding: nav.navRightPadding,
     });
-    this.loadLatest();
   },
 
   onShow() {
@@ -37,29 +42,32 @@ Page({
     this.loadLatest();
   },
 
+  latestLoading: false,
+  latestScope: "",
+  latestRevision: 0,
+  stopDiaryUpdates: null as null | (() => void),
+  onUnload() { this.latestRevision += 1; this.stopDiaryUpdates?.(); },
+
   async loadLatest() {
+    const scope = getSessionScope();
+    if (this.latestLoading && this.latestScope === scope) return;
+    if (this.latestScope !== scope) this.setData({ latest: null });
+    this.latestScope = scope; this.latestLoading = true;
+    const version = ++this.latestRevision;
+    if (!getAccessToken()) { this.setData({ latest: null, loading: false, failed: false }); this.latestLoading = false; return; }
     try {
       const list = await listDiaries();
-      const safeList = Array.isArray(list) ? list : [];
-      const latest = safeList.length > 0 ? safeList[0] : null;
-      if (latest) {
-        let cover = "";
-        const panels = Array.isArray(latest.panels) ? latest.panels : [];
-        if (panels.length > 0 && panels[0].image_url) {
-          cover = await authenticatedMediaUrl(panels[0].image_url);
-        }
-        this.setData({
-          latest: { ...latest, cover },
-          loading: false,
-          failed: false,
-        });
-      } else {
-        this.setData({ latest: null, loading: false, failed: false });
+      if (version !== this.latestRevision || scope !== getSessionScope()) return;
+      const latest = Array.isArray(list) ? list[0] : null;
+      this.setData({ latest: latest ? { ...latest, cover: "" } : null, loading: false, failed: false, syncNote: diarySyncLabel() });
+      if (latest?.panels?.[0]?.image_url) {
+        authenticatedMediaUrl(thumbnailUrl(latest.panels[0].image_url)).then((cover) => {
+          if (version === this.latestRevision && scope === getSessionScope()) this.setData({ "latest.cover": cover });
+        }).catch(() => {});
       }
-    } catch (e) {
-      console.warn("Load latest diary failed:", e);
-      this.setData({ loading: false, failed: true, latest: null });
-    }
+    } catch {
+      if (version === this.latestRevision && scope === getSessionScope()) this.setData({ loading: false, failed: true });
+    } finally { if (version === this.latestRevision) this.latestLoading = false; }
   },
 
   onOpenDiary() {
@@ -77,6 +85,10 @@ Page({
 
   onOpenBookshelf() {
     wx.navigateTo({ url: "/pages/bookshelf/index" });
+  },
+
+  onOpenEmotion() {
+    wx.navigateTo({ url: "/pages/bookshelf/index?mode=emotion" });
   },
 
   onRetry() {

@@ -41,3 +41,4 @@
 .memory-copy { flex: 1; min-width: 0; }
 .memory-date { display: block; font-size: 22rpx; color: #A89789; }
 .memory-title { display: block; margin-top: 6rpx; font-size: 28rpx; font-weight: 600; color: #3E3026; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hero-chat-hint { display: block; text-align: center; color: #7A6F64; font-size: 24rpx; padding: 8rpx 0 16rpx; }

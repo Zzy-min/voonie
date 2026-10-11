@@ -56,8 +56,9 @@
       <text class="empty-copy">填写上方信息创建角色，再为它上传参考图。</text>
     </view>
     <view class="character-list" wx:else>
-      <view class="character-row {{activeId === item.id ? 'active' : ''}}" wx:for="{{characters}}" wx:key="id" data-id="{{item.id}}" bindtap="onSelect">
-        <image class="character-cover" wx:if="{{item.cover}}" src="{{item.cover}}" mode="aspectFill" />
+      <view class="character-entry" wx:for="{{characters}}" wx:key="id">
+      <view class="character-row {{activeId === item.id ? 'active' : ''}}" data-id="{{item.id}}" bindtap="onSelect">
+        <image class="character-cover" wx:if="{{item.cover}}" src="{{item.cover}}" mode="aspectFill" data-id="{{item.id}}" data-reference-id="{{item.references[0].id}}" binderror="onReferenceError" />
         <view class="character-placeholder" wx:else>{{item.initial}}</view>
         <view class="character-copy">
           <view class="character-name-row"><text class="character-name">{{item.name}}</text><text class="active-tag" wx:if="{{activeId === item.id}}">当前主角</text></view>
@@ -66,8 +67,17 @@
         </view>
         <view class="character-actions">
           <view class="upload-btn" catchtap="onUploadReference" data-id="{{item.id}}">+ 参考图</view>
-          <view class="delete-btn" catchtap="onDeleteCharacter" data-id="{{item.id}}">{{deletingId === item.id ? '删除中…' : '删除'}}</view>
+          <view class="delete-btn" catchtap="onDeleteCharacter" data-id="{{item.id}}">{{deletingId === item.id ? '删除中…' : '删除角色'}}</view>
         </view>
+      </view>
+      <view class="reference-gallery" wx:if="{{item.references.length}}">
+        <view class="reference-tile" wx:for="{{item.references}}" wx:for-item="reference" wx:key="id">
+          <view class="reference-image reference-unavailable" wx:if="{{reference.imageFailed}}" role="button" data-id="{{item.id}}" data-reference-id="{{reference.id}}" bindtap="onRetryReference">加载失败 · 点按重试</view>
+          <image class="reference-image" wx:else src="{{reference.url}}" mode="aspectFill" data-id="{{item.id}}" data-reference-id="{{reference.id}}" bindtap="onPreviewReference" binderror="onReferenceError" />
+          <text class="reference-avatar-label" wx:if="{{index === 0}}">角色头像</text>
+          <view class="reference-delete" role="button" aria-label="删除这张参考图" data-id="{{item.id}}" data-reference-id="{{reference.id}}" catchtap="onDeleteReference">{{deletingReferenceId === reference.id ? '删除中…' : '删除此图'}}</view>
+        </view>
+      </view>
       </view>
     </view>
   </scroll-view>

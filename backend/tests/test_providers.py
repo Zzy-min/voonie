@@ -1,11 +1,13 @@
 import asyncio
 import hashlib
 import importlib.util
+import io
 import uuid
 from pathlib import Path
 
 import pytest
 import httpx
+from PIL import Image
 
 from voonie.backend.app.core.config import Settings
 from voonie.backend.app.models.schemas import CharacterConfig, ComicPanel
@@ -179,7 +181,10 @@ def test_image_service_retries_rejected_prompt_without_exact_location():
             self.prompts.append(prompt)
             if len(self.prompts) == 1:
                 raise ImagePromptRejectedError("image_prompt_rejected")
-            return b"\x89PNG\r\n\x1a\nsafe-image"
+            image = Image.new("RGB", (640, 960), (232, 190, 122))
+            output = io.BytesIO()
+            image.save(output, format="PNG")
+            return output.getvalue()
 
     media_dir = Path("voonie/backend/.pytest-data") / f"image-retry-{uuid.uuid4().hex}"
     settings = Settings(TEMP_MEDIA_DIR=media_dir)
@@ -212,6 +217,25 @@ def test_image_service_retries_rejected_prompt_without_exact_location():
     finally:
         path.unlink(missing_ok=True)
         media_dir.rmdir()
+
+
+@pytest.mark.parametrize(
+    ("aspect_ratio", "expected_size"),
+    [("1:1", (1024, 1024)), ("4:3", (1024, 768)), ("3:4", (768, 1024))],
+)
+def test_image_service_fits_output_without_cropping(aspect_ratio, expected_size):
+    source = Image.new("RGB", (640, 960), (220, 160, 90))
+    source_bytes = io.BytesIO()
+    source.save(source_bytes, format="PNG")
+
+    normalized = ImageGenService._fit_without_crop(source_bytes.getvalue(), aspect_ratio)
+
+    with Image.open(io.BytesIO(normalized)) as result:
+        assert result.size == expected_size
+        # Portrait source remains portrait-sized and centered; it is not cropped to fill.
+        assert result.getpixel((expected_size[0] // 2, expected_size[1] // 2)) == (220, 160, 90)
+        if aspect_ratio == "4:3":
+            assert result.getpixel((0, expected_size[1] // 2)) == (255, 249, 241)
 
 
 def test_mock_providers_are_deterministic():

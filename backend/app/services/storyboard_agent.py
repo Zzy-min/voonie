@@ -16,8 +16,10 @@ class StoryboardAgent:
 4. 只挑选指定数量、视觉与情绪价值最高的真实瞬间作为记忆插图。每张图必须提供 source_excerpt 和 organized_diary 中可直接定位的 anchor_text。
 5. 插图不是绘本故事，不要补剧情，不要机械覆盖每件事；信息不足时使用抽象情绪画面。
 6. 同一篇日记的人物、画风、配色和时间氛围必须连续；画面内不要生成文字或气泡。
-7. 主人公始终是“主人公漫画设定”中的同一个人。除非用户原话明确提到另一人物，否则画面中不得新增第二个人；若确有配角，必须明确区分主人公与配角，不得交换外貌、服装或身份。
-8. 输出一句 20-40 字、不过度分析的小宠物暖心便签。
+7. 主人公身份以用户原话为准。如果用户明确说自己是或变成动物，按该动物的自然形态绘制想象场景，不得画成人兽混合体或强行套用人的外貌。除非用户原话明确提到另一人物，否则画面中不得新增第二个人；若确有配角，必须明确区分主人公与配角，不得交换外貌、服装或身份。
+8. 输出一句 20-40 字、不过度分析的小宠物暖心便签。便签是 Vonnie 对“用户昵称”本人说的话，必须自然称呼用户，并具体回应本篇日记中的经历或情绪；“主人公漫画设定”的角色名称只服务于插图，绝不能用作用户称呼。
+9. 情绪结果必须区分主导情绪与可选次要情绪，并给出 1-10 强度与 0-1 置信度；不确定时降低置信度，不得强行诊断。
+10. 每张插图必须完整保留主人公头部、面部和关键动作，不得贴边裁切；多人场景也必须保证主体完整、构图留有安全边距。
 必须只输出符合请求结构的 JSON。"""
 
     @staticmethod
@@ -90,6 +92,7 @@ class StoryboardAgent:
         transcript: str,
         character: CharacterConfig,
         custom_style: str | None = None,
+        user_nickname: str = "小主人",
     ) -> Storyboard:
         style_prompt = custom_style or self.settings.STYLE_PRESETS.get(
             character.style_preset,
@@ -100,6 +103,9 @@ class StoryboardAgent:
         user_prompt = f"""
 【用户完整语音转录】
 {transcript}
+
+【用户昵称】
+{user_nickname}
 
 【主人公漫画设定】
 - 角色名称: {character.character_name}
@@ -112,6 +118,10 @@ ILLUSTRATION_COUNT={illustration_count}
 """
         parsed = await self.provider.complete_json(self.SYSTEM_PROMPT, user_prompt)
         storyboard = Storyboard.model_validate(parsed)
+        nickname = user_nickname.strip() or "小主人"
+        note = storyboard.companion_note.strip()
+        if nickname not in note:
+            storyboard.companion_note = f"{nickname}，{note}"
         return self._enforce_source_fidelity(storyboard, transcript, illustration_count)
 
 

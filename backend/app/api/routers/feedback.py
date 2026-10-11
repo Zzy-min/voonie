@@ -6,6 +6,7 @@ from PIL import Image
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from voonie.backend.app.api.deps import get_current_user
+from voonie.backend.app.api.content_review import review_image, review_text
 from voonie.backend.app.core.exceptions import ApiError
 from voonie.backend.app.db.models import Feedback, User
 from voonie.backend.app.db.session import get_db
@@ -22,6 +23,7 @@ async def create_feedback(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> FeedbackResponse:
+    await review_text(request, current_user, body.description)
     attachment_key = None
     if body.screenshot_base64:
         try:
@@ -30,6 +32,11 @@ async def create_feedback(
                 raise ApiError(413, "feedback_image_too_large", "截图不能超过 5MB")
             with Image.open(BytesIO(payload)) as image:
                 image.verify()
+            if request.app.state.settings.CONTENT_REVIEW_ENABLED and current_user.wechat_openid:
+                with Image.open(BytesIO(payload)) as image:
+                    reviewed = BytesIO()
+                    image.convert("RGB").save(reviewed, format="PNG")
+                await review_image(request, current_user, reviewed.getvalue(), "image/png")
             attachment_key = str(request.app.state.storage.save_bytes(payload, suffix=".jpg"))
         except ApiError:
             raise

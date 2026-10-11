@@ -6,7 +6,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from voonie.backend.app.api.deps import get_current_user
+from voonie.backend.app.api.deps import get_current_user, get_optional_user
 from voonie.backend.app.core.exceptions import ApiError
 from voonie.backend.app.db.models import DiaryArtifact, Panel, SharePost, ShareReaction, ShareReport, User
 from voonie.backend.app.db.session import get_db
@@ -14,6 +14,11 @@ from voonie.backend.app.schemas.shares import (
     ReactionResponse, ShareDetailResponse, SharePostResponse, ShareReportCreate, ShareReportResponse,
     ShareUpsert, ShareVisibilityUpdate,
 )
+
+
+def require_community(request: Request) -> None:
+    if not request.app.state.settings.COMMUNITY_ENABLED:
+        raise ApiError(404, "community_unavailable", "Community is unavailable")
 
 
 router = APIRouter(prefix="/shares", tags=["Shares"])
@@ -44,7 +49,8 @@ async def serialize(post: SharePost, viewer_id: str, db: AsyncSession) -> ShareP
     )
 
 
-@router.post("", response_model=SharePostResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=SharePostResponse, status_code=status.HTTP_201_CREATED,
+             dependencies=[Depends(require_community)])
 async def upsert_share(payload: ShareUpsert, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     artifact = await db.scalar(select(DiaryArtifact).where(
         DiaryArtifact.job_id == payload.artifact_id, DiaryArtifact.user_id == current_user.id
@@ -67,19 +73,19 @@ async def upsert_share(payload: ShareUpsert, current_user: User = Depends(get_cu
     return await serialize(post, current_user.id, db)
 
 
-@router.get("", response_model=list[SharePostResponse])
-async def list_shares(order: str = "recommend", current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+@router.get("", response_model=list[SharePostResponse], dependencies=[Depends(require_community)])
+async def list_shares(order: str = "recommend", current_user: User | None = Depends(get_optional_user), db: AsyncSession = Depends(get_db)):
     query = select(SharePost).where(SharePost.is_public.is_(True))
     query = query.order_by(SharePost.created_at.desc())
     posts = list((await db.scalars(query.limit(50))).all())
-    items = [await serialize(post, current_user.id, db) for post in posts]
+    items = [await serialize(post, current_user.id if current_user else "", db) for post in posts]
     if order == "recommend":
         items.sort(key=lambda item: (item.likes + item.collects * 2, item.created_at), reverse=True)
     return items
 
 
-@router.get("/{post_id}", response_model=ShareDetailResponse)
-async def get_public_share(post_id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+@router.get("/{post_id}", response_model=ShareDetailResponse, dependencies=[Depends(require_community)])
+async def get_public_share(post_id: str, current_user: User | None = Depends(get_optional_user), db: AsyncSession = Depends(get_db)):
     post = await db.scalar(select(SharePost).where(SharePost.id == post_id, SharePost.is_public.is_(True)))
     if post is None:
         raise ApiError(404, "share_not_found", "Share not found")
@@ -103,12 +109,15 @@ async def get_public_share(post_id: str, current_user: User = Depends(get_curren
         mood=artifact.emotion_label,
         image_urls=image_urls,
         created_at=post.created_at,
-        is_owner=post.user_id == current_user.id,
+        is_owner=bool(current_user and post.user_id == current_user.id),
     )
 
 
+@router.put("/{post_id}", response_model=SharePostResponse)
 @router.patch("/{post_id}", response_model=SharePostResponse)
-async def update_share_visibility(payload: ShareVisibilityUpdate, post_id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def update_share_visibility(payload: ShareVisibilityUpdate, post_id: str, request: Request, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    if payload.is_public:
+        require_community(request)
     post = await db.scalar(select(SharePost).where(SharePost.id == post_id, SharePost.user_id == current_user.id))
     if post is None:
         raise ApiError(404, "share_not_found", "Share not found")
@@ -129,7 +138,8 @@ async def delete_share(post_id: str, current_user: User = Depends(get_current_us
     await db.commit()
 
 
-@router.post("/{post_id}/reports", response_model=ShareReportResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/{post_id}/reports", response_model=ShareReportResponse, status_code=status.HTTP_201_CREATED,
+             dependencies=[Depends(require_community)])
 async def report_share(payload: ShareReportCreate, post_id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     post = await db.scalar(select(SharePost).where(SharePost.id == post_id, SharePost.is_public.is_(True)))
     if post is None:
@@ -148,7 +158,7 @@ async def report_share(payload: ShareReportCreate, post_id: str, current_user: U
     return ShareReportResponse(submitted=True)
 
 
-@router.get("/{post_id}/media/{filename}")
+@router.get("/{post_id}/media/{filename}", dependencies=[Depends(require_community)])
 async def public_share_media(post_id: str, filename: str, request: Request, db: AsyncSession = Depends(get_db)):
     if Path(filename).name != filename:
         raise ApiError(404, "media_not_found", "Media not found")
@@ -163,7 +173,8 @@ async def public_share_media(post_id: str, filename: str, request: Request, db: 
     return FileResponse(str(media_path))
 
 
-@router.put("/{post_id}/reactions/{kind}", response_model=ReactionResponse)
+@router.put("/{post_id}/reactions/{kind}", response_model=ReactionResponse,
+            dependencies=[Depends(require_community)])
 async def toggle_reaction(post_id: str, kind: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     if kind not in {"like", "collect"}:
         raise ApiError(422, "invalid_reaction", "Reaction must be like or collect")

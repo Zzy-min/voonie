@@ -121,9 +121,11 @@ DATABASE_URL=sqlite+aiosqlite:///./backend/voonie.db
 
 WECHAT_APP_ID=your-wechat-mini-program-app-id
 WECHAT_APP_SECRET=your-wechat-mini-program-secret
-REQUIRE_WECHAT_BINDING=true
+REQUIRE_WECHAT_BINDING=false
 
 OPENAI_API_KEY=
+CONTENT_REVIEW_ENABLED=false
+WECHAT_CONTENT_REVIEW_ENABLED=false
 DEEPSEEK_API_KEY=
 ARK_API_KEY=
 ```

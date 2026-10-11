@@ -1,6 +1,7 @@
 // pages/share/index.ts
 import { authenticatedMediaUrl, getDiaryDetail, publishShare } from "../../utils/api";
 import { getNavInfo } from "../../utils/nav";
+import { COMMUNITY_ENABLED } from "../../utils/featureFlags";
 
 Page({
   data: {
@@ -17,6 +18,10 @@ Page({
   },
 
   async onLoad(options: Record<string, string | undefined>) {
+    if (!COMMUNITY_ENABLED) {
+      wx.reLaunch({ url: "/pages/index/index" });
+      return;
+    }
     const nav = getNavInfo();
     this.setData({
       statusBarHeight: nav.statusBarHeight,
@@ -100,6 +105,7 @@ Page({
   },
 
   async onPublish() {
+    if (!COMMUNITY_ENABLED) return;
     if (this.data.publishing) return;
     if (!this.data.diaryId) {
       wx.showToast({ title: "请先选择一本已生成的日记", icon: "none" });

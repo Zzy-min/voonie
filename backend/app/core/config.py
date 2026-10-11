@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     )
     MEDIA_PUBLIC_BASE: str = ""
     MEMORY_OPT_IN_DEFAULT: bool = False
+    COMMUNITY_ENABLED: bool = False
+    CONTENT_REVIEW_ENABLED: bool = False
+    IMAGE_CONTENT_REVIEW_ENABLED: bool = False
+    WECHAT_CONTENT_REVIEW_ENABLED: bool = False
     ARQ_INLINE: bool = True
     COMPAT_WAIT_SECONDS: float = 15.0
     TESTING: bool = False
@@ -55,7 +59,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("WECHAT_APP_SECRET", "WECHAT_MINI_SECRET"),
     )
     WECHAT_LOGIN_TIMEOUT_SECONDS: float = 8.0
-    REQUIRE_WECHAT_BINDING: bool = True
+    REQUIRE_WECHAT_BINDING: bool = False
 
     BASE_DIR: Path = BACKEND_DIR
     TEMP_MEDIA_DIR: Path = BASE_DIR / "temp_media"
@@ -132,6 +136,14 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_secrets(self):
+        if self.CONTENT_REVIEW_ENABLED and not (self.OPENAI_API_KEY or self.WECHAT_CONTENT_REVIEW_ENABLED):
+            raise ValueError("A content review provider is required when content review is enabled")
+        if self.WECHAT_CONTENT_REVIEW_ENABLED and not self.CONTENT_REVIEW_ENABLED:
+            raise ValueError("WeChat content review requires content review to be enabled")
+        if self.WECHAT_CONTENT_REVIEW_ENABLED and (not self.WECHAT_APP_ID or not self.WECHAT_APP_SECRET):
+            raise ValueError("WeChat content review requires app credentials")
+        if self.IMAGE_CONTENT_REVIEW_ENABLED and (not self.CONTENT_REVIEW_ENABLED or not self.OPENAI_API_KEY):
+            raise ValueError("Image content review requires an enabled independent review provider")
         if self.PRODUCTION:
             if self.JWT_SECRET == "development-only-change-me-before-production" or len(self.JWT_SECRET) < 32:
                 raise ValueError("JWT_SECRET must be a unique value of at least 32 characters in production")

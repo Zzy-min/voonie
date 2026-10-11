@@ -1,0 +1,25 @@
+.page { min-height: 100vh; padding: 48rpx 32rpx 80rpx; background: #fff9f1; color: #3e3026; }
+.intro { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 20rpx 20rpx 48rpx; }
+.mascot { width: 200rpx; height: 180rpx; margin-bottom: 20rpx; }
+.eyebrow { color: #c26741; font-size: 22rpx; letter-spacing: 3rpx; }
+.heading { font-size: 42rpx; font-weight: 700; line-height: 1.35; margin: 18rpx 0; }
+.description { color: #7c6a5c; font-size: 26rpx; line-height: 1.65; }
+.section-title { font-size: 30rpx; font-weight: 700; margin: 12rpx 0 22rpx; }
+.scene-scroll { white-space: nowrap; width: 100%; }
+.scene-row { display: flex; gap: 18rpx; width: max-content; padding-bottom: 12rpx; }
+.scene { width: 190rpx; padding: 8rpx; border: 3rpx solid transparent; border-radius: 24rpx; background: #fff; text-align: center; flex: none; }
+.scene.selected { border-color: #c26741; }
+.scene image { display: block; width: 174rpx; height: 150rpx; border-radius: 16rpx; }
+.scene text { display: block; padding: 10rpx 0 4rpx; font-size: 25rpx; }
+.record-button { margin: 32rpx 0 14rpx; border-radius: 100rpx; background: #c26741; color: #fff; font-size: 30rpx; }
+.record-button[disabled] { opacity: .55; }
+.status { display: block; min-height: 72rpx; color: #7c6a5c; text-align: center; font-size: 24rpx; }
+.shelf-title { margin-top: 32rpx; }
+.empty { padding: 48rpx 24rpx; background: #fff; border-radius: 24rpx; color: #7c6a5c; text-align: center; font-size: 26rpx; }
+.book { display: flex; align-items: center; gap: 20rpx; padding: 16rpx; margin: 16rpx 0; background: #fff; border-radius: 24rpx; }
+.book image { width: 130rpx; height: 112rpx; border-radius: 16rpx; flex: none; }
+.book-copy { flex: 1; min-width: 0; }
+.book-title { display: block; font-size: 26rpx; font-weight: 600; }
+.book-meta { display: block; margin-top: 8rpx; color: #8f8175; font-size: 22rpx; }
+.play-button { margin: 0; padding: 8rpx 16rpx; border-radius: 18rpx; color: #a35735; background: #fff1e8; font-size: 24rpx; }
+.storage-note { display: block; margin-top: 40rpx; color: #9a8a7c; font-size: 22rpx; line-height: 1.6; }

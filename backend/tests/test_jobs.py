@@ -1,6 +1,7 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Event
 import time
 import uuid
 
@@ -14,6 +15,7 @@ from sqlalchemy import func, select
 from voonie.backend.app.main import create_app
 from voonie.backend.app.services.image_gen_service import ImageGenService
 from voonie.backend.app.services.pet_agent import PetCompanionAgent
+from voonie.backend.app.providers.image import MockImageProvider
 
 
 @pytest.fixture
@@ -87,6 +89,37 @@ def test_diary_job_keeps_full_text_and_creates_sparse_anchored_illustrations(job
     assert completed["result"]["organized_diary"] == "今天喝了奶茶，下班时看到晚霞，心情很好。"
     assert completed["result"]["emotion_curve"]
     assert completed["result"]["panels"][0]["anchor_text"] in completed["result"]["organized_diary"]
+
+
+def test_status_remains_queryable_during_blocking_image_work(jobs_client):
+    started = Event()
+    release = Event()
+
+    class BlockingImageProvider:
+        async def generate(self, prompt, *, ref_image, seed):
+            started.set()
+            assert release.wait(3), "image work was not released"
+            return await MockImageProvider().generate(prompt, ref_image=ref_image, seed=seed)
+
+    jobs_client.app.state.image_service = ImageGenService(
+        provider=BlockingImageProvider(),
+        app_settings=jobs_client.app.state.settings,
+        storage=jobs_client.app.state.storage,
+    )
+    headers = auth_headers(jobs_client, "jobs-progress-001")
+    try:
+        created = jobs_client.post(
+            "/api/v1/jobs/comic", headers=headers,
+            json={"text": "今天在公园散步，看到一棵开花的树。"},
+        )
+        assert created.status_code == 202
+        assert started.wait(2)
+        status = jobs_client.get(f"/api/v1/jobs/{created.json()['job_id']}", headers=headers)
+        assert status.status_code == 200
+        assert status.json()["stage"] == "rendering"
+        assert status.json()["progress"] == 0.25
+    finally:
+        release.set()
 
 
 def test_job_status_is_isolated_by_user(jobs_client):

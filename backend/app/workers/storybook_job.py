@@ -2,7 +2,7 @@ import asyncio
 from datetime import datetime, timezone
 from sqlalchemy import update
 
-from voonie.backend.app.db.models import DailyDiary, DiaryArtifact, Job, Panel
+from voonie.backend.app.db.models import DailyDiary, DiaryArtifact, Job, Panel, User
 from voonie.backend.app.models.schemas import CharacterConfig, ComicPanel, EmotionSummary, Storyboard
 from voonie.backend.app.schemas.daily import DailyStorybook
 from voonie.backend.app.services.prompt_builder import character_snapshot
@@ -30,6 +30,7 @@ async def _execute_storybook_job(context: dict, job_id: str) -> None:
         if claimed.rowcount != 1:
             return
         job = await session.get(Job, job_id)
+        owner = await session.get(User, job.user_id)
         request_data = dict(job.request_json)
         daily = await session.get(DailyDiary, request_data["daily_diary_id"])
         if daily is None or not daily.summary:
@@ -70,7 +71,9 @@ async def _execute_storybook_job(context: dict, job_id: str) -> None:
     ]
 
     async def render_one(panel: ComicPanel):
-        path, prompt_text = await context["image_service"].generate_panel_image(panel, character, None)
+        path, prompt_text = await context["image_service"].generate_panel_image(
+            panel, character, None, review_openid=owner.wechat_openid if owner else None,
+        )
         panel.image_url = context["storage"].get_file_url(path)
         return panel.panel_id, path, prompt_text
 
@@ -143,6 +146,9 @@ async def _execute_storybook_job(context: dict, job_id: str) -> None:
             "page_count": len(panels),
             "composite_comic_url": context["storage"].get_file_url(composite_path),
         }
+        owner = await session.get(User, user_id)
+        if owner is not None and owner.wechat_openid is None:
+            owner.guest_generated_count += 1
         await session.commit()
 
 

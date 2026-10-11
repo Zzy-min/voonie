@@ -26,6 +26,10 @@ class InspectingProvider:
         self.last_system = ""
 
     async def complete_json(self, system: str, prompt: str) -> dict:
+        if system.startswith("PET_DIARY_SCOPE_INPUT_V1"):
+            return {"allowed": True, "category": "diary"}
+        if system.startswith("PET_DIARY_SCOPE_OUTPUT_V1"):
+            return {"allowed": True}
         self.last_system = system
         self.last_prompt = prompt
         return {"reply": "小夏，我在这里陪你！", "pet_action": "happy", "referenced_memories": ["2026-08-28"]}

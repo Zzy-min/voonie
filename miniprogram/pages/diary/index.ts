@@ -1,7 +1,9 @@
 // pages/diary/index.ts
-import { authenticatedMediaUrl, deleteDiary, getDiaryDetail, getPublicShareDetail, listDiaries, mediaUrl, DiaryItem } from "../../utils/api";
+import { getSessionScope, authenticatedMediaUrl, deleteDiary, getDiaryDetail, getPublicShareDetail, listDiaries, mediaUrl, DiaryItem } from "../../utils/api";
 import { buildContentBlocks } from "../../utils/contentBlocks";
 import { getNavInfo } from "../../utils/nav";
+import { COMMUNITY_ENABLED } from "../../utils/featureFlags";
+import { subscribeDiaryUpdates, localDiaryStore } from "../../utils/api";
 
 Page({
   data: {
@@ -13,7 +15,7 @@ Page({
     secondParagraph: "",
     illustrationUrl: "",
     illustrationUrls: [] as string[],
-    contentBlocks: [] as Array<{ type: "text" | "image"; text?: string; url?: string; key: string }>,
+    contentBlocks: [] as Array<{ type: "text" | "image"; text?: string; url?: string; sourceUrl?: string; imageStatus?: string; key: string }>,
     currentPage: 1,
     totalPages: 1,
     turnKey: 0,
@@ -24,7 +26,23 @@ Page({
     shareAuthor: "",
   },
 
+  renderScope: "",
+  renderRevision: 0,
+  stopDiaryUpdates: null as null | (() => void),
+  onUnload() { this.renderRevision += 1; this.stopDiaryUpdates?.(); },
+
   async onLoad(options: Record<string, string | undefined>) {
+    this.stopDiaryUpdates = subscribeDiaryUpdates((id) => {
+      if (this.data.readOnly) return;
+      if (this.renderScope && this.renderScope !== getSessionScope()) {
+        this.renderRevision += 1; this.setData({ diary: null, contentBlocks: [], illustrationUrls: [], loading: false }); return;
+      }
+      const current = this.data.diary;
+      if (!current || (id && id !== current.id)) return;
+      const next = localDiaryStore.get(getSessionScope(), current.id);
+      if (!next) { this.renderRevision += 1; this.setData({ diary: null, contentBlocks: [], illustrationUrls: [], loading: false }); }
+      else if (JSON.stringify(next) !== JSON.stringify(current)) this.renderDiary(next);
+    });
     const nav = getNavInfo();
     this.setData({
       statusBarHeight: nav.statusBarHeight,
@@ -35,12 +53,16 @@ Page({
 
     const diaryId = options.id;
     const shareId = options.shareId || "";
+    if (shareId && !COMMUNITY_ENABLED) {
+      wx.reLaunch({ url: "/pages/index/index" });
+      return;
+    }
     if (shareId) {
       // 请求发出前就锁定公开只读模式，失败重试不得退回“我的最新日记”。
       this.setData({ shareId, readOnly: true });
       wx.showShareMenu({ menus: ["shareAppMessage", "shareTimeline"] });
     } else {
-      wx.hideShareMenu();
+      wx.showShareMenu({ menus: ["shareAppMessage"] });
     }
     try {
       if (shareId) {
@@ -106,37 +128,42 @@ Page({
   },
 
   async renderDiary(item: DiaryItem) {
-    if (!item) {
-      this.setData({ loading: false, failed: false, diary: null });
-      return;
-    }
+    const version = ++this.renderRevision;
+    this.renderScope = getSessionScope();
+    const started = Date.now();
+    if (!item) { this.setData({ loading: false, failed: false, diary: null }); return; }
     const panels = Array.isArray(item.panels) ? item.panels : [];
-    const inlineReferences = (item.reference_images || []).filter((reference) => reference.include_in_content);
-    const referenceUrls = await Promise.all(inlineReferences.map((reference) => authenticatedMediaUrl(reference.image_url)));
-    const panelUrls = await Promise.all(panels.map((panel) => authenticatedMediaUrl(panel.image_url)));
-    const illustrationUrls = [...referenceUrls, ...panelUrls];
-    const contentBlocks = buildContentBlocks(
-      item.full_content || "",
-      illustrationUrls,
-      [
-        ...inlineReferences.map((reference) => reference.paragraph_anchor || ""),
-        ...panels.map((panel) => panel.anchor_text || panel.source_excerpt || ""),
-      ]
-    );
-    const textParts = contentBlocks.filter((block) => block.type === "text").map((block) => block.text || "");
+    const references = (item.reference_images || []).filter((ref) => ref.include_in_content);
+    const urls = [...references.map((ref) => ref.image_url), ...panels.map((panel) => panel.image_url)];
+    const contentBlocks = buildContentBlocks(item.full_content || "", urls, [
+      ...references.map((ref) => ref.paragraph_anchor || ""), ...panels.map((panel) => panel.anchor_text || panel.source_excerpt || ""),
+    ]).map((block) => block.type === "image" ? { ...block, sourceUrl: block.url, url: "", imageStatus: "loading" } : block);
+    this.setData({ diary: item, contentBlocks, illustrationUrls: [], illustrationUrl: "", totalPages: Math.max(panels.length, 1), currentPage: 1, loading: false, failed: false });
+    console.info("voling.performance", { stage: "diary_text", ms: Date.now() - started });
+    contentBlocks.filter((block) => block.type === "image").forEach((block) => this.loadDiaryImage(block.key, version));
+  },
 
-    this.setData({
-      diary: item,
-      firstParagraph: textParts[0] || "",
-      secondParagraph: textParts.slice(1).join("\n\n"),
-      illustrationUrl: illustrationUrls[0] || "",
-      illustrationUrls,
-      contentBlocks,
-      totalPages: Math.max(panels.length || 1, 1),
-      currentPage: 1,
-      loading: false,
-      failed: false,
-    });
+  async loadDiaryImage(key: string, version = this.renderRevision, force = false) {
+    const scope = getSessionScope();
+    const index = this.data.contentBlocks.findIndex((block) => block.key === key);
+    const block = this.data.contentBlocks[index];
+    if (!block?.sourceUrl) return;
+    this.setData({ [`contentBlocks[${index}].imageStatus`]: "loading" });
+    try {
+      const url = await authenticatedMediaUrl(block.sourceUrl, force);
+      if (version !== this.renderRevision || scope !== getSessionScope()) return;
+      this.setData({ [`contentBlocks[${index}].url`]: url, [`contentBlocks[${index}].imageStatus`]: "ready" });
+      const urls = this.data.contentBlocks.filter((item) => item.type === "image" && item.url).map((item) => item.url!);
+      this.setData({ illustrationUrls: urls, illustrationUrl: urls[0] || "" });
+    } catch {
+      if (version === this.renderRevision && scope === getSessionScope()) this.setData({ [`contentBlocks[${index}].imageStatus`]: "failed" });
+    }
+  },
+
+  onRetryImage(e: WechatMiniprogram.BaseEvent) { this.loadDiaryImage(e.currentTarget.dataset.key, this.renderRevision, true); },
+  onImageError(e: WechatMiniprogram.BaseEvent) {
+    const index = this.data.contentBlocks.findIndex((block) => block.key === e.currentTarget.dataset.key);
+    if (index >= 0) this.setData({ [`contentBlocks[${index}].imageStatus`]: "failed" });
   },
 
   async onRetry() {
@@ -191,6 +218,7 @@ Page({
 
   onEdit() {
     if (this.data.readOnly) return;
+    if (this.renderScope && this.renderScope !== getSessionScope()) { this.renderRevision += 1; this.setData({ diary: null, contentBlocks: [], illustrationUrls: [], loading: false }); return; }
     const diary = this.data.diary;
     if (!diary || !diary.id) return;
     wx.navigateTo({ url: `/pages/diary-edit/index?id=${encodeURIComponent(diary.id)}` });
@@ -208,16 +236,9 @@ Page({
   },
 
   onShare() {
-    if (this.data.readOnly) {
-      wx.showToast({ title: "请使用右上角菜单分享", icon: "none" });
-      return;
-    }
-    const diary = this.data.diary;
-    if (!diary || !diary.id) return;
-    wx.navigateTo({
-      url: `/pages/share/index?id=${encodeURIComponent(diary.id)}`,
-    });
+    wx.showToast({ title: "请使用右上角菜单分享小程序", icon: "none" });
   },
+
 
   onDelete() {
     if (this.data.readOnly || !this.data.diary?.id) return;
@@ -243,24 +264,11 @@ Page({
   },
 
   onShareAppMessage() {
-    if (!this.data.readOnly || !this.data.shareId) {
-      return { title: "Voling 日记 · 记录你的每一天", path: "/pages/index/index" };
-    }
-    const diary = this.data.diary;
-    return {
-      title: diary?.title ? `我在 Voling 记录了：${diary.title}` : "我在 Voling 记录了一段今天的故事",
-      path: `/pages/diary/index?shareId=${encodeURIComponent(this.data.shareId)}`,
-      imageUrl: this.data.illustrationUrls[0] || undefined,
-    };
+    return { title: "Voling 日记 · 制作自己的 AI 绘本", path: "/pages/index/index" };
   },
 
   onShareTimeline() {
-    if (!this.data.readOnly || !this.data.shareId) return { title: "Voling 日记" };
-    return {
-      title: this.data.diary?.title || "我在 Voling 记录了一段今天的故事",
-      query: `shareId=${encodeURIComponent(this.data.shareId)}`,
-      imageUrl: this.data.illustrationUrls[0] || undefined,
-    };
+    return { title: "Voling 日记 · 制作自己的 AI 绘本" };
   },
 
   onBack() {

@@ -9,7 +9,7 @@
       </view>
       <view class="header-titles">
         <text class="record-title">{{isRecording ? (isPaused ? '先停一下' : 'Vonnie 在听') : '把今天告诉 Vonnie'}}</text>
-        <text class="record-subtitle">{{isRecording ? '可以说完再点完成，中途能暂停' : '先说或先写，文字会留在这里给你看'}}</text>
+        <text class="record-subtitle">{{isRecording ? '可以说完再点完成，中途能暂停' : '先说或先写，文字会保留'}}</text>
       </view>
     </view>
   </view>
@@ -49,24 +49,38 @@
         show-confirm-bar="false"
         adjust-position
         cursor-spacing="24"
-        disabled="{{isRecording || isUploading}}"
+        disabled="{{isRecording || isUploading || textSubmitting}}"
         bindinput="onDraftTextInput"
       />
     </view>
     <view class="reference-card">
+      <view class="generation-options">
+        <view class="generation-option" bindtap="onChooseStyle"><text>画风</text><text>{{styleLabel}} ›</text></view>
+        <view class="generation-option" bindtap="onChooseAspectRatio"><text>图片比例</text><text>{{aspectRatio}} ›</text></view>
+      </view>
       <view class="reference-head">
-        <view><text class="reference-title">日记参考图</text><text class="reference-sub">可选，生成插图时会真实传给 AI</text></view>
-        <text class="reference-type" wx:if="{{referencePath}}" bindtap="onChooseReferenceType">{{referenceTypeLabel}} ›</text>
+        <view><text class="reference-title">日记参考图</text><text class="reference-sub">最多 3 张，可分别设置用途和正文显示</text></view>
+        <text class="reference-type">{{references.length}}/3</text>
       </view>
-      <view class="reference-empty" wx:if="{{!referencePath}}" bindtap="onChooseReference">＋ 从相册选择或拍照</view>
-      <view class="reference-preview" wx:else>
-        <image src="{{referencePath}}" mode="aspectFill" />
-        <view class="reference-actions"><text bindtap="onChooseReference">更换</text><text class="danger" bindtap="onRemoveReference">移除</text></view>
+      <view class="reference-list">
+        <view class="reference-item" wx:for="{{references}}" wx:key="key">
+          <view class="reference-preview">
+            <image src="{{item.path}}" mode="aspectFit" data-key="{{item.key}}" bindtap="onPreviewReference" />
+            <text wx:if="{{item.missing}}" class="reference-error">图片已失效，请更换</text>
+            <view class="reference-actions">
+              <text data-key="{{item.key}}" bindtap="onChooseReference">更换</text>
+              <text data-key="{{item.key}}" bindtap="onChooseReferenceType">{{item.typeLabel}} ›</text>
+              <text class="danger" data-key="{{item.key}}" bindtap="onRemoveReference">移除</text>
+            </view>
+          </view>
+          <view class="reference-content-option"><text class="option-title">插入日记正文</text><switch checked="{{item.includeInContent}}" disabled="{{textSubmitting}}" color="#E8A74C" data-key="{{item.key}}" bindchange="onReferenceContentChange" /></view>
+          <view wx:if="{{item.status === 'uploading'}}" class="reference-progress"><progress percent="{{item.progress}}" stroke-width="3" activeColor="#E8A74C" /><text>上传 {{item.progress}}%</text></view>
+          <text wx:elif="{{item.status === 'uploaded'}}" class="reference-uploaded">已上传</text>
+          <view wx:elif="{{item.status === 'failed' || item.missing}}" class="reference-error" data-key="{{item.key}}" bindtap="onRetryReference">{{item.missing ? '更换图片' : '上传失败，点按重试'}}</view>
+        </view>
       </view>
-      <view class="reference-content-option" wx:if="{{referencePath}}">
-        <view><text class="option-title">插入日记正文</text><text class="option-sub">生成后按内容语义放到合适段落</text></view>
-        <switch checked="{{referenceIncludeInContent}}" color="#E8A74C" bindchange="onReferenceContentChange" />
-      </view>
+      <view class="reference-empty" wx:if="{{references.length < 3}}" bindtap="onChooseReference">{{choosingReference ? '正在保存图片…' : '＋ 从相册选择或拍照'}}</view>
+
     </view>
   </scroll-view>
 

@@ -8,10 +8,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from voonie.backend.app.api.deps import get_current_user
+from voonie.backend.app.api.content_review import review_embedded_reference, review_text
 from voonie.backend.app.core.exceptions import ApiError
 from voonie.backend.app.db.models import DailyDiary, Job, User
 from voonie.backend.app.db.session import get_db
 from voonie.backend.app.schemas.jobs import ComicJobRequest, JobQueuedResponse, JobStatusResponse
+from voonie.backend.app.services.guest_generation_limit import require_guest_generation_slot
 from voonie.backend.app.workers.comic_job import run_inline_comic_job
 
 
@@ -43,6 +45,9 @@ async def owned_job(db: AsyncSession, job_id: str, user_id: str) -> Job:
 async def retry_failed_job(request: Request, db: AsyncSession, job: Job) -> JobQueuedResponse:
     if job.status not in {"failed", "cancelled"}:
         return JobQueuedResponse(job_id=job.id)
+    owner = await db.get(User, job.user_id)
+    if owner is not None:
+        await require_guest_generation_slot(db, owner)
     job.status = "queued"
     job.stage = "queued"
     job.progress = 0
@@ -53,6 +58,8 @@ async def retry_failed_job(request: Request, db: AsyncSession, job: Job) -> JobQ
     request.state.job_id = job.id
     if request.app.state.settings.ARQ_INLINE:
         context = {
+            "settings": request.app.state.settings,
+            "inline_job_semaphore": request.app.state.inline_job_semaphore,
             "session_factory": request.app.state.db_session_factory,
             "storyboard_agent": request.app.state.storyboard_agent,
             "image_service": request.app.state.image_service,
@@ -91,11 +98,16 @@ async def enqueue_comic_job(
     current_user: User,
     payload: dict,
     idempotency_key: str | None,
+    *,
+    reference_already_stored: bool = False,
 ) -> JobQueuedResponse:
     # Cache scalar identity before any rollback. SQLAlchemy expires ORM objects on
     # rollback; dereferencing current_user.id afterwards can trigger async IO from
     # the wrong context under a real idempotency race.
     user_id = current_user.id
+    await review_text(request, current_user, "\n".join(str(payload.get(key) or "") for key in ("text", "custom_style")))
+    if not reference_already_stored:
+        await review_embedded_reference(request, current_user, payload.get("ref_image_b64"))
     if idempotency_key:
         existing = await db.scalar(
             select(Job).where(Job.user_id == user_id, Job.idempotency_key == idempotency_key)
@@ -111,6 +123,7 @@ async def enqueue_comic_job(
         request.app.state.settings.COMIC_HOURLY_LIMIT,
         commit=False,
     )
+    await require_guest_generation_slot(db, current_user)
     job = Job(user_id=user_id, type="comic", request_json=payload, idempotency_key=idempotency_key)
     db.add(job)
     try:
@@ -131,6 +144,8 @@ async def enqueue_comic_job(
     request.state.job_id = job.id
     if request.app.state.settings.ARQ_INLINE:
         context = {
+            "settings": request.app.state.settings,
+            "inline_job_semaphore": request.app.state.inline_job_semaphore,
             "session_factory": request.app.state.db_session_factory,
             "storyboard_agent": request.app.state.storyboard_agent,
             "image_service": request.app.state.image_service,
@@ -188,6 +203,18 @@ async def retry_job(
     if job.status not in {"failed", "cancelled"}:
         return JobQueuedResponse(job_id=job.id)
     return await retry_failed_job(request, db, job)
+
+
+@router.get("/by-key/{idempotency_key}", response_model=JobStatusResponse)
+async def get_job_by_key(
+    idempotency_key: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    job = await db.scalar(select(Job).where(Job.user_id == current_user.id, Job.idempotency_key == idempotency_key))
+    if job is None:
+        raise ApiError(404, "job_not_found", "Job not found")
+    return serialize_job(job)
 
 
 @router.get("/{job_id}", response_model=JobStatusResponse)

@@ -14,7 +14,8 @@
       <text class="title-sub">私人聊天</text>
     </view>
     <view class="drawer-actions">
-      <view class="action-btn" bindtap="onClose">
+      <view class="clear-chat" bindtap="onClearChat" role="button" aria-label="清空聊天" hover-class="clear-pressed">清空聊天</view>
+      <view class="action-btn" bindtap="onClose" role="button" aria-label="关闭聊天" hover-class="close-pressed">
         <text class="close-icon">✕</text>
       </view>
     </view>
@@ -22,6 +23,7 @@
 
   <!-- 对话消息列表 -->
   <scroll-view class="chat-messages" scroll-y scroll-top="{{scrollTop}}" scroll-with-animation>
+    <view class="chat-messages-inner">
     <view class="msg-item pet-msg">
       <image class="msg-avatar" src="/assets/images/voonie/voonie-avatar.png" mode="aspectFit" />
       <view class="msg-bubble pet-bubble">
@@ -34,6 +36,7 @@
       <view wx:if="{{item.role === 'user'}}" class="msg-item user-msg">
         <view class="msg-bubble user-bubble">
           <text>{{item.content}}</text>
+          <view wx:if="{{item.role === 'user' && item.status === 'failed'}}" class="message-retry" data-id="{{item.id}}" bindtap="onRetryMessage">{{item.error || '发送失败'}} · 点按重试</view>
         </view>
       </view>
 
@@ -51,6 +54,7 @@
       <view class="msg-bubble pet-bubble thinking">
         <text>Vonnie 正在想你说的话…</text>
       </view>
+    </view>
     </view>
   </scroll-view>
 

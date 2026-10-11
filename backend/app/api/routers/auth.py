@@ -6,7 +6,7 @@ import secrets
 
 import httpx
 from fastapi import APIRouter, Depends, Request, Response, status
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,7 +20,9 @@ from voonie.backend.app.core.security import (
     hash_refresh_token,
     verify_password,
 )
-from voonie.backend.app.db.models import RefreshToken, User
+from voonie.backend.app.db.models import Job, RefreshToken, User
+from voonie.backend.app.services.guest_generation_limit import GUEST_GENERATION_JOB_TYPES, GUEST_GENERATION_LIMIT
+from voonie.backend.app.services.guest_account_merge import merge_guest_account
 from voonie.backend.app.db.session import get_db
 from voonie.backend.app.schemas.auth import (
     DeviceAuthRequest,
@@ -119,7 +121,7 @@ async def exchange_wechat_phone(settings, code: str) -> str:
 async def optional_authenticated_user(request: Request, db: AsyncSession) -> User | None:
     authorization = request.headers.get("Authorization", "")
     bearer_token = authorization[7:] if authorization.lower().startswith("bearer ") else None
-    token = request.cookies.get("voonie_access") or bearer_token
+    token = bearer_token or request.cookies.get("voonie_access")
     if not token:
         return None
     try:
@@ -255,9 +257,16 @@ async def login_by_wechat(
     openid = await exchange_wechat_openid(settings, body.code)
 
     user = await db.scalar(select(User).where(User.wechat_openid == openid))
+    current_account = await optional_authenticated_user(request, db)
+    if user is not None and current_account is not None and current_account.id != user.id:
+        try:
+            await merge_guest_account(db, current_account, user)
+        except IntegrityError as exc:
+            await db.rollback()
+            raise ApiError(409, "account_merge_conflict", "账号资料冲突，请联系支持处理合并") from exc
     if user is None:
         # Only bind an anonymous installation when its signed access token proves ownership.
-        user = await optional_authenticated_user(request, db)
+        user = current_account
         if user is None:
             user = User(wechat_openid=openid, memory_opt_in=settings.MEMORY_OPT_IN_DEFAULT)
             db.add(user)
@@ -378,7 +387,13 @@ async def logout(
 
 
 @router.get("/me", response_model=UserResponse)
-async def get_me(current_user: User = Depends(get_authenticated_user)) -> UserResponse:
+async def get_me(current_user: User = Depends(get_authenticated_user), db: AsyncSession = Depends(get_db)) -> UserResponse:
+    remaining = None
+    if not current_user.wechat_openid:
+        active = await db.scalar(select(func.count()).select_from(Job).where(
+            Job.user_id == current_user.id, Job.type.in_(GUEST_GENERATION_JOB_TYPES), Job.status.in_(("queued", "running")),
+        )) or 0
+        remaining = max(0, GUEST_GENERATION_LIMIT - (current_user.guest_generated_count or 0) - active)
     return UserResponse(
         id=current_user.id,
         email=current_user.email,
@@ -388,6 +403,7 @@ async def get_me(current_user: User = Depends(get_authenticated_user)) -> UserRe
         quote_note=current_user.quote_note,
         memory_opt_in=current_user.memory_opt_in,
         wechat_bound=bool(current_user.wechat_openid),
+        guest_generations_remaining=remaining,
         created_at=current_user.created_at.isoformat() if current_user.created_at else None,
     )
 

@@ -48,6 +48,7 @@ class UserResponse(BaseModel):
     quote_note: str = "今天也值得被好好收藏。"
     memory_opt_in: bool = True
     wechat_bound: bool = False
+    guest_generations_remaining: int | None = None
     created_at: str | None = None
 
 

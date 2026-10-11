@@ -1,7 +1,9 @@
+import { petSession } from "../../utils/petSession";
 // pages/pet/index.ts - 萌宠独立页（案例屏 3：快捷聊天）
 // 聊天、写日记（录音）、写下愿望
 import { chatWithPet, getPetStatus } from "../../utils/api";
 import { getNavInfo } from "../../utils/nav";
+import { enableHomeShareMenu, homeShareHandlers } from "../../utils/homeShare";
 
 interface ChatMsg {
   id: string;
@@ -10,6 +12,7 @@ interface ChatMsg {
 }
 
 Page({
+  ...homeShareHandlers,
   keyboardHeightListener: null as null | ((res: { height: number }) => void),
 
   data: {
@@ -27,9 +30,14 @@ Page({
     dateLabel: "",
     keyboardHeight: 0,
     composerStyle: "",
+    viewportStyle: "",
+    scrollEndId: "",
   },
 
+  unsubscribeChat: null as null | (() => void),
+
   onLoad() {
+    enableHomeShareMenu();
     const nav = getNavInfo();
     const now = new Date();
     const weekdays = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
@@ -46,10 +54,11 @@ Page({
     if (typeof wx.onKeyboardHeightChange === "function") {
       wx.onKeyboardHeightChange(this.keyboardHeightListener);
     }
-    this.loadPetStatus();
+    this.unsubscribeChat = petSession.subscribe((state: any) => this.setData({ ...state }, () => this.scrollToLatest()));
   },
 
   onShow() {
+    petSession.sync();
     const app = getApp();
     if (app && app.globalData) {
       app.globalData.activeTab = 2;
@@ -69,6 +78,7 @@ Page({
   },
 
   onUnload() {
+    this.unsubscribeChat?.();
     this.restoreTabBar();
     if (this.keyboardHeightListener && typeof wx.offKeyboardHeightChange === "function") {
       wx.offKeyboardHeightChange(this.keyboardHeightListener);
@@ -79,7 +89,7 @@ Page({
   restoreTabBar() {
     const tab = typeof this.getTabBar === "function" ? this.getTabBar() : null;
     if (tab && typeof tab.setHidden === "function") tab.setHidden(false);
-    if (this.data.keyboardHeight) this.setData({ keyboardHeight: 0, composerStyle: "" });
+    if (this.data.keyboardHeight) this.setData({ keyboardHeight: 0, composerStyle: "", viewportStyle: "" });
   },
 
   onKeyboardHeightChange(e: any) {
@@ -93,7 +103,14 @@ Page({
     this.setData({
       keyboardHeight: height,
       composerStyle: height > 0 ? `bottom:${height}px;` : "",
-      scrollTop: height > 0 ? 999999 : this.data.scrollTop,
+      viewportStyle: height > 0 ? `height:calc(100vh - ${height}px);padding-bottom:0;` : "",
+    }, () => this.scrollToLatest());
+  },
+
+  scrollToLatest() {
+    // Reset the anchor so repeated keyboard changes and replies trigger a new scroll.
+    this.setData({ scrollEndId: "" }, () => {
+      wx.nextTick(() => this.setData({ scrollEndId: "chat-bottom" }));
     });
   },
 
@@ -102,7 +119,7 @@ Page({
     setTimeout(() => {
       const tab = typeof this.getTabBar === "function" ? this.getTabBar() : null;
       if (tab && typeof tab.setHidden === "function") tab.setHidden(false);
-      this.setData({ keyboardHeight: 0, composerStyle: "" });
+      this.applyKeyboardHeight(0);
     }, 160);
   },
 
@@ -169,6 +186,11 @@ Page({
   },
 
   async onSend() {
+    await getApp<any>().initSession();
+    if (!getApp<any>().globalData.currentUser) {
+      wx.showToast({ title: "暂时无法连接，请稍后重试", icon: "none" });
+      return;
+    }
     const text = this.data.inputValue.trim();
     if (!text || this.data.loading) return;
     this.setData({ inputValue: "" });
@@ -176,33 +198,16 @@ Page({
   },
 
   async sendMessage(text: string) {
-    const existingMessages = this.data.messages;
-    const userMsg: ChatMsg = { id: "user-" + Date.now(), role: "user", content: text };
-    const newMsgs = [...existingMessages, userMsg];
-    this.setData({ messages: newMsgs, loading: true, scrollTop: newMsgs.length * 500 });
+    try { await petSession.send(text, { pet_name: this.data.petName }); }
+    catch (error: any) { wx.showToast({ title: error.message || "发送失败", icon: "none" }); }
+  },
 
-    try {
-      const history = existingMessages.slice(-12).map((message) => ({
-        role: message.role === "pet" ? "assistant" : "user",
-        content: message.content,
-      }));
-      const res = await chatWithPet(text, { pet_name: this.data.petName, history });
-      const petMsg: ChatMsg = {
-        id: "pet-" + Date.now(),
-        role: "pet",
-        content: res.reply || "我在这里，慢慢说。",
-      };
-      const updated = [...this.data.messages, petMsg];
-      this.setData({ messages: updated, loading: false, scrollTop: updated.length * 500 });
-    } catch (err) {
-      const fallbackMsg: ChatMsg = {
-        id: "pet-" + Date.now(),
-        role: "pet",
-        content: "消息没有发送成功，请检查网络后再试一次。刚才这条内容尚未交给 Voonie。",
-      };
-      const updated = [...this.data.messages, fallbackMsg];
-      this.setData({ messages: updated, loading: false, scrollTop: updated.length * 500 });
-    }
+  onRetryMessage(e: WechatMiniprogram.BaseEvent) {
+    petSession.send("", { pet_name: this.data.petName }, e.currentTarget.dataset.id).catch((error: any) => wx.showToast({ title: error.message, icon: "none" }));
+  },
+
+  onClearChat() {
+    wx.showModal({ title: "清空聊天记录", content: "将清空本机当前账号的萌宠聊天记录。日记不受影响。", success: (res) => { if (res.confirm) petSession.clear(); } });
   },
 
 });

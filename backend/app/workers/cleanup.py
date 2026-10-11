@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select
 
-from voonie.backend.app.db.models import CharacterReference, DiaryArtifact, DiaryEntry, Job, Panel
+from voonie.backend.app.db.models import Character, CharacterReference, DailyDiary, DiaryArtifact, DiaryEntry, DiaryReference, Feedback, Job, Panel
 from voonie.backend.app.services.storage_service import StorageService
 
 
@@ -60,12 +60,22 @@ async def cleanup_expired_media(
 
 
 async def cleanup_cron(context: dict) -> None:
+    # Expired audio can still be an input to an active task. Check before any deletion.
+    async with context["session_factory"]() as session:
+        active = await session.scalar(select(Job.id).where(Job.status.in_(["queued", "running"])).limit(1))
+        if active:
+            return
     await cleanup_expired_media(context["session_factory"], context["storage"])
     async with context["session_factory"]() as session:
         artifacts = list((await session.scalars(select(DiaryArtifact))).all())
         panels = list((await session.scalars(select(Panel))).all())
         entries = list((await session.scalars(select(DiaryEntry))).all())
         character_keys = (await session.scalars(select(CharacterReference.media_key))).all()
+        diary_reference_keys = (await session.scalars(select(DiaryReference.media_key))).all()
+        character_covers = (await session.scalars(select(Character.reference_image_key))).all()
+        daily_diaries = (await session.scalars(select(DailyDiary))).all()
+        feedback_keys = (await session.scalars(select(Feedback.attachment_key))).all()
+        active_jobs = (await session.scalars(select(Job).where(Job.status.in_(["queued", "running"])))).all()
         referenced = {
             key for artifact in artifacts
             for key in [artifact.composite_key, *(artifact.panel_keys_json or [])]
@@ -73,5 +83,10 @@ async def cleanup_cron(context: dict) -> None:
         }
         referenced.update(panel.image_key for panel in panels if panel.image_key)
         referenced.update(entry.audio_key for entry in entries if entry.audio_key)
-        referenced.update(character_keys)
+        referenced.update(key for key in [*character_keys, *diary_reference_keys, *character_covers, *feedback_keys] if key)
+        referenced.update(key for diary in daily_diaries for key in [diary.cover_key, diary.composite_key] if key)
+        # Long-running generation can create files before the final database commit.
+        # Hold the sweep while a job is active rather than guessing its intermediate paths.
+        if active_jobs:
+            return
     context["storage"].cleanup_expired_files(referenced)

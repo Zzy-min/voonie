@@ -1,4 +1,4 @@
-<view class="voonie-page chat-page">
+<view class="voonie-page chat-page" style="{{viewportStyle}}">
   <view class="chat-header" style="padding-top: {{statusBarHeight}}px;">
     <view class="header-nav" style="height: {{navBarHeight}}px; padding-right: {{navRightPadding}}px;">
       <image class="header-avatar" src="/assets/images/voonie/voonie-avatar.png" mode="aspectFill" />
@@ -6,7 +6,7 @@
     </view>
   </view>
 
-  <scroll-view class="messages" scroll-y scroll-top="{{scrollTop}}" scroll-with-animation>
+  <scroll-view class="messages" scroll-y scroll-into-view="{{scrollEndId}}" scroll-with-animation>
     <view class="day-label">{{dateLabel}}</view>
     <view class="message vonnie-message">
       <image class="message-avatar" src="/assets/images/voonie/voonie-avatar.png" mode="aspectFill" />
@@ -14,10 +14,11 @@
     </view>
 
     <block wx:for="{{messages}}" wx:key="id">
-      <view class="message user-message" wx:if="{{item.role === 'user'}}"><view class="bubble user-bubble"><text>{{item.content}}</text></view></view>
+      <view class="message user-message" wx:if="{{item.role === 'user'}}"><view class="bubble user-bubble"><text>{{item.content}}</text><view wx:if="{{item.status === 'failed'}}" class="message-retry" data-id="{{item.id}}" bindtap="onRetryMessage">{{item.error || '发送失败'}} · 点按重试</view></view></view>
       <view class="message vonnie-message" wx:else><image class="message-avatar" src="/assets/images/voonie/voonie-avatar.png" mode="aspectFill" /><view class="bubble vonnie-bubble"><text>{{item.content}}</text></view></view>
     </block>
     <view wx:if="{{loading}}" class="message vonnie-message"><image class="message-avatar" src="/assets/images/voonie/voonie-avatar.png" mode="aspectFill" /><view class="bubble vonnie-bubble thinking"><text>Vonnie 正在想你说的话…</text></view></view>
+    <view id="chat-bottom" style="height:1px;" />
   </scroll-view>
 
   <view class="composer-wrap {{keyboardHeight > 0 ? 'keyboard-open' : ''}}" style="{{composerStyle}}">
@@ -26,6 +27,7 @@
         <view class="quick-chip" bindtap="onSelectTag" data-text="今天有点累，陪我聊聊吧">陪我聊聊</view>
         <view class="quick-chip" bindtap="onSelectTag" data-text="今天发生了一件开心的事">今天很开心</view>
         <view class="quick-chip" bindtap="onChipWriteDiary">写成日记</view>
+        <view class="quick-chip" bindtap="onClearChat">清空聊天</view>
       </view>
     </scroll-view>
     <view class="composer">

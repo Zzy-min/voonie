@@ -7,6 +7,10 @@
 
   <scroll-view class="diary-scroll" scroll-y>
     <view class="module-links">
+      <view class="module-link" bindtap="onOpenEmotion">
+        <image src="/assets/icons/icon-star.svg" mode="aspectFit" />
+        <view><text class="module-title">情绪</text><text class="module-copy">按心情查看日记</text></view><text class="arrow">›</text>
+      </view>
       <view class="module-link" bindtap="onOpenCalendar">
         <image src="/assets/icons/tab-bookshelf.svg" mode="aspectFit" />
         <view><text class="module-title">回忆日历</text><text class="module-copy">按日期找回记录</text></view><text class="arrow">›</text>

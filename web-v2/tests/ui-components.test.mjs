@@ -96,6 +96,28 @@ test("web diary can regenerate one illustration without replacing the whole diar
   assert.match(api, /custom_prompt/);
 });
 
+test("calendar filters diary records by full local date instead of day number", async () => {
+  const source = await readFile(path.join(root, "app", "page.tsx"), "utf8");
+
+  assert.match(source, /dateKey: formatDateKey\(storyDate\)/);
+  assert.match(source, /record\.dateKey === calendarDateFilter/);
+  assert.match(source, /const monthKey = `\$\{year\}-\$\{String\(month \+ 1\)\.padStart\(2, "0"\)\}`/);
+  assert.match(source, /calendarDateFilter === dayKey/);
+  assert.doesNotMatch(source, /r\.dateLabel\.includes\(calendarDateFilter\)/);
+  assert.doesNotMatch(source, /setCalendarDateFilter\(`\$\{dayNum\}日`\)/);
+});
+
+test("calendar supports year and month navigation and scopes the record list", async () => {
+  const source = await readFile(path.join(root, "app", "page.tsx"), "utf8");
+
+  assert.match(source, /aria-label="选择年份"/);
+  assert.match(source, /aria-label="选择月份"/);
+  assert.match(source, /aria-label="查看上个月"/);
+  assert.match(source, /aria-label="查看下个月"/);
+  assert.match(source, /record\.dateKey\.startsWith\(`\$\{monthKey\}-`\)/);
+  assert.match(source, /setCalendarDateFilter\(null\)/);
+});
+
 test("uses the cleaned Voonie v2 identity assets without repeating sprite cells", async () => {
   const source = await readFile(path.join(root, "app", "page.tsx"), "utf8");
 

@@ -1,9 +1,11 @@
 // pages/generation/index.ts
-import { cancelJob, diaryDraftKey, waitForJob, listDiaries, getDiaryDetail, retryJob, JobCanceledError } from "../../utils/api";
+import { invalidateDiaryCache, cancelJob, diaryDraftKey, waitForJob, listDiaries, getDiaryDetail, retryJob, JobCanceledError } from "../../utils/api";
 import { getNavInfo } from "../../utils/nav";
 import { readDiaryDraft, removeDiaryDraft, writeDiaryDraft } from "../../utils/draftStorage";
+import { enableHomeShareMenu, homeShareHandlers } from "../../utils/homeShare";
 
 Page({
+  ...homeShareHandlers,
   data: {
     statusBarHeight: 20,
     navBarHeight: 44,
@@ -19,6 +21,7 @@ Page({
   },
 
   onLoad(options: Record<string, string | undefined>) {
+    enableHomeShareMenu();
     const nav = getNavInfo();
     const draft = readDiaryDraft(diaryDraftKey());
     this.setData({
@@ -123,7 +126,7 @@ Page({
       }
     }
     try {
-      const diaries = await listDiaries();
+      const diaries = await listDiaries(true);
       const target = diaries && diaries.length > 0 ? diaries[0] : null;
       const diaryId = target ? target.id : (this.data.entryId || this.data.jobId);
       wx.redirectTo({
@@ -168,6 +171,7 @@ Page({
 
 // 仅在生成完成后清理本地草稿；失败态必须保留，以便恢复。
 function findAndDeleteDraft(page: any) {
+  invalidateDiaryCache();
   try {
     removeDiaryDraft(diaryDraftKey());
   } catch (e) {

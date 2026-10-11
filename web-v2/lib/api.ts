@@ -370,6 +370,7 @@ export type DiaryRecord = {
     visual_reason?: string;
   }>;
   composite_comic_url?: string | null;
+  entry_date?: string | null;
   created_at: string;
 };
 

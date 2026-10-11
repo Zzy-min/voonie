@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from voonie.backend.app.api.deps import get_current_user
+from voonie.backend.app.api.content_review import review_image, review_text
 from voonie.backend.app.core.exceptions import ApiError
 from voonie.backend.app.db.models import Character, CharacterReference, User
 from voonie.backend.app.db.session import get_db
@@ -68,6 +69,7 @@ async def create_character(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> CharacterResponse:
+    await review_text(request, current_user, f"{body.name}\n{body.appearance_prompt}")
     character = Character(
         user_id=current_user.id,
         name=body.name,
@@ -109,6 +111,7 @@ async def update_character(
 ) -> CharacterResponse:
     character = await owned_character(db, character_id, current_user.id)
     changes = body.model_dump(exclude_unset=True)
+    await review_text(request, current_user, "\n".join(str(changes[key]) for key in ("name", "appearance_prompt") if key in changes))
     if "bible" in changes and changes["bible"] is not None:
         character.bible_json = changes.pop("bible")
     for key, value in changes.items():
@@ -171,6 +174,11 @@ async def upload_reference(
         raise
     except Exception as exc:
         raise ApiError(415, "invalid_image", "Reference image is not a valid image") from exc
+    if request.app.state.settings.CONTENT_REVIEW_ENABLED and current_user.wechat_openid:
+        with Image.open(BytesIO(payload)) as image:
+            reviewed = BytesIO()
+            image.convert("RGB").save(reviewed, format="PNG")
+        await review_image(request, current_user, reviewed.getvalue(), "image/png")
     saved = request.app.state.storage.save_bytes(payload, suffix=".png")
     occupied_slots = {item.slot for item in character.references if item.slot is not None}
     reference_slot = next(slot for slot in range(1, 6) if slot not in occupied_slots)

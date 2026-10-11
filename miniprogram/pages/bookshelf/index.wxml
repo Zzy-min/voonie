@@ -18,6 +18,11 @@
 
   <scroll-view class="bookshelf-scroll" scroll-y bindscrolltolower="onLoadMore" lower-threshold="120">
     <view class="bookshelf-content">
+    <scroll-view class="emotion-filter" scroll-x wx:if="{{emotionMode && emotionFilters.length}}">
+      <view class="emotion-filter-row">
+        <view wx:for="{{emotionFilters}}" wx:key="*this" data-emotion="{{item}}" bindtap="onSelectEmotion" class="emotion-chip {{selectedEmotion === item ? 'active' : ''}}">{{item}}</view>
+      </view>
+    </scroll-view>
     <view wx:if="{{loading}}" class="shelf-loading">
       <view class="voonie-spinner"></view>
       <text>正在整理你的日记与绘本…</text>
@@ -32,11 +37,6 @@
         <text class="cal-title">回忆日历</text>
         <text class="cal-sub">翻开每一天的平凡，看看都珍藏了什么</text>
       </view>
-      <text class="cal-arrow">›</text>
-    </view>
-    <view class="shelf-calendar-card square-entry-card" bindtap="onOpenSquare">
-      <view class="cal-icon-box"><text>🐾</text></view>
-      <view class="cal-info"><text class="cal-title">分享广场</text><text class="cal-sub">看看大家公开分享的温暖绘本</text></view>
       <text class="cal-arrow">›</text>
     </view>
 

@@ -1,0 +1,30 @@
+<view class="page">
+  <view class="intro">
+    <image class="mascot" src="/assets/images/voonie/voonie-sit.png" mode="aspectFit" />
+    <text class="eyebrow">VOLING · 本地绘本</text>
+    <text class="heading">把声音留在自己的小绘本里</text>
+    <text class="description">选择一幅内置插画，录下想保存的声音。录音和绘本索引只保存在当前设备，不上传，也不公开分享。</text>
+  </view>
+
+  <view class="section-title">选择绘本插画</view>
+  <scroll-view class="scene-scroll" scroll-x>
+    <view class="scene-row">
+      <view wx:for="{{scenes}}" wx:key="name" class="scene {{selectedScene === index ? 'selected' : ''}}" data-index="{{index}}" bindtap="chooseScene">
+        <image src="{{item.image}}" mode="aspectFill" />
+        <text>{{item.name}}</text>
+      </view>
+    </view>
+  </scroll-view>
+
+  <button class="record-button" disabled="{{saving}}" bindtap="toggleRecording">{{saving ? '正在保存…' : recording ? '停止并保存' : '开始录音'}}</button>
+  <text class="status" role="status">{{status}}</text>
+
+  <view class="section-title shelf-title">我的本地绘本</view>
+  <view wx:if="{{books.length === 0}}" class="empty">还没有绘本。选一幅插画，再录下第一段声音吧。</view>
+  <view wx:for="{{books}}" wx:key="id" class="book">
+    <image src="{{item.image}}" mode="aspectFill" />
+    <view class="book-copy"><text class="book-title">{{item.title}}</text><text class="book-meta">{{item.duration}} 秒 · 仅本机</text></view>
+    <button class="play-button" data-id="{{item.id}}" bindtap="playBook">{{playingId === item.id ? '停止' : '播放'}}</button>
+  </view>
+  <text class="storage-note">卸载小程序或清理微信数据可能清除本机绘本。原云端日记、AI 生成和分享功能已暂停。</text>
+</view>

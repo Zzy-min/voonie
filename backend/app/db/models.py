@@ -30,6 +30,7 @@ class User(TimestampMixin, Base):
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     device_id: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
     device_secret_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    guest_generated_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     auth_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     memory_opt_in: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1", nullable=False)
     nickname: Mapped[str] = mapped_column(String(32), default="小主人", nullable=False)

@@ -1,7 +1,9 @@
 // pages/auth/index.ts
-import { bindPhoneIdentity, loginUser, registerUser, loginWithWeChatCode } from "../../utils/api";
+import { bindPhoneIdentity, getCurrentUser, loginUser, registerUser, loginWithWeChatCode } from "../../utils/api";
+import { enableHomeShareMenu, homeShareHandlers } from "../../utils/homeShare";
 
 Page({
+  ...homeShareHandlers,
   data: {
     statusBarHeight: 20,
     isLogin: true,
@@ -16,12 +18,15 @@ Page({
     authAction: "",
     showEmailForm: false,
     showPassword: false,
+    trialExhausted: false,
   },
 
-  onLoad() {
+  onLoad(options: Record<string, string>) {
+    enableHomeShareMenu();
     const sys = wx.getSystemInfoSync();
     this.setData({
       statusBarHeight: sys.statusBarHeight || 20,
+      trialExhausted: options?.trial === "done",
     });
   },
 
@@ -118,6 +123,7 @@ Page({
 
       // 2) 交后端换 openid 并签 JWT（微信官方登录，不再是 device 冒充）
       await loginWithWeChatCode(loginRes.code);
+      getApp<any>().globalData.currentUser = await getCurrentUser();
       wx.hideLoading();
       this.setData({ authAction: "" });
       wx.showToast({ title: "登录成功", icon: "success" });

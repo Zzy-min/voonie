@@ -1,5 +1,5 @@
 // app.ts - Voling 微信小程序全局入口与会话管理
-import { ensureSession, getCurrentUser, getApiBase, setApiBase, UserProfile } from "./utils/api";
+import { ensureSession, getCurrentUser, getSavedUser, getSessionScope, trimLocalImageCache, getApiBase, setApiBase, startGuestSession, UserProfile } from "./utils/api";
 
 export interface IAppOption {
   globalData: {
@@ -34,6 +34,8 @@ App<IAppOption>({
     // 支持开发者工具覆盖 API_BASE（本地存储键 voonie_api_base）
     this.globalData.apiBase = getApiBase();
     setApiBase(this.globalData.apiBase);
+    // Only evict recoverable image copies before any page is rendered.
+    try { if (getSessionScope()) trimLocalImageCache(); } catch {}
 
     // 检查本地草稿
     const draft = wx.getStorageSync("voonie_diary_draft");
@@ -63,27 +65,22 @@ App<IAppOption>({
     sessionInitPromise = (async () => {
       try {
         const sessionReady = await ensureSession();
-        if (!sessionReady) {
-          wx.reLaunch({ url: "/pages/auth/index" });
-          return;
-        }
-        const user = await getCurrentUser();
+        const user = (sessionReady ? await getCurrentUser() : null) || await startGuestSession();
         if (user) {
+          const legacyDraft = wx.getStorageSync("voonie_diary_draft");
+          const draftKey = `voonie_diary_draft:${user.id}`;
+          if (legacyDraft && !wx.getStorageSync(draftKey)) wx.setStorageSync(draftKey, legacyDraft);
           this.globalData.networkReady = true;
           this.globalData.currentUser = user;
           if (this.userInfoReadyCallback) {
             this.userInfoReadyCallback(user);
           }
-          if (!user.wechat_bound) {
-            wx.reLaunch({ url: "/pages/account-security/index?required=1" });
-            return;
-          }
         } else {
           this.globalData.currentUser = null;
-          wx.reLaunch({ url: "/pages/auth/index" });
         }
       } catch (err) {
         this.globalData.networkReady = false;
+        if (getSessionScope()) this.globalData.currentUser = getSavedUser();
         console.warn("[Voling App] Session init failed:", err);
         wx.showToast({ title: "网络连接失败，请检查网络后重试", icon: "none", duration: 3000 });
       } finally {

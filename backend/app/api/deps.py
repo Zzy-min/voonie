@@ -38,6 +38,28 @@ async def get_authenticated_user(
     return user
 
 
+async def get_optional_user(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    db: AsyncSession = Depends(get_db),
+) -> User | None:
+    """Resolve a viewer when present, while allowing public read-only routes."""
+    token = credentials.credentials if credentials is not None else request.cookies.get("voonie_access")
+    if token is None:
+        if request.app.state.settings.TESTING:
+            return User(id=TEST_USER_ID, device_id="test-device", wechat_openid="test-openid")
+        return None
+    try:
+        payload = decode_token(token, "access", request.app.state.settings)
+    except TokenValidationError as exc:
+        raise ApiError(status.HTTP_401_UNAUTHORIZED, "invalid_token", "Invalid access token") from exc
+    user = await db.get(User, payload["sub"])
+    if user is None or payload.get("ver", 0) != user.auth_version:
+        raise ApiError(status.HTTP_401_UNAUTHORIZED, "invalid_token", "Invalid access token")
+    request.state.user_id = user.id
+    return user
+
+
 async def get_current_user(
     request: Request,
     user: User = Depends(get_authenticated_user),

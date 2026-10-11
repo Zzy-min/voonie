@@ -1,6 +1,7 @@
 // pages/square/index.ts
 import { deleteShare, listShares, mediaUrl, reportShare, toggleShareReaction, updateShareVisibility } from "../../utils/api";
 import { getNavInfo } from "../../utils/nav";
+import { COMMUNITY_ENABLED } from "../../utils/featureFlags";
 
 Page({
   data: {
@@ -15,6 +16,10 @@ Page({
   },
 
   onLoad(options: Record<string, string | undefined>) {
+    if (!COMMUNITY_ENABLED) {
+      wx.reLaunch({ url: "/pages/index/index" });
+      return;
+    }
     const nav = getNavInfo();
     this.setData({
       statusBarHeight: nav.statusBarHeight,
@@ -25,6 +30,7 @@ Page({
   },
 
   onShow() {
+    if (!COMMUNITY_ENABLED) return;
     const app = getApp();
     if (app && app.globalData) app.globalData.activeTab = 3;
     const tab = typeof this.getTabBar === "function" ? this.getTabBar() : null;
@@ -36,6 +42,7 @@ Page({
   },
 
   async loadPosts() {
+    if (!COMMUNITY_ENABLED) return;
     this.setData({ loading: true, failed: false });
     try {
       const data = await listShares(this.data.currentTab);

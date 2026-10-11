@@ -91,6 +91,8 @@
 .phone-secondary { background: #FFFDF8; color: #3D332A; border: 1rpx solid #E8DFD3; }
 .quick-login-icon { width: 38rpx; height: 38rpx; filter: brightness(0) invert(1); }
 .privacy-hint { display: block; margin-top: 14rpx; color: #A89789; font-size: 20rpx; line-height: 1.5; text-align: center; }
+.guest-continue { margin: 14rpx 0 0; padding: 10rpx 0; border: 0; background: transparent; color: #7C6A5C; font-size: 24rpx; line-height: 1.5; }
+.guest-continue::after { border: 0; }
 .email-entry { margin: 28rpx 0 0; display: flex; align-items: center; gap: 18rpx; color: #7A6F64; font-size: 22rpx; }
 .email-entry-line { flex: 1; height: 1rpx; background: #E8DFD3; }
 .email-panel { margin-top: 26rpx; padding-top: 2rpx; }

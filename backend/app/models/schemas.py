@@ -3,14 +3,18 @@ from pydantic import BaseModel, Field, field_validator
 
 class EmotionSummary(BaseModel):
     primary_emotion: str = Field(description="主导情绪，如: joy, relaxed, anxious, sad, healing, excited")
+    secondary_emotion: Optional[str] = Field(default=None, description="次要情绪；没有明确次要情绪时为空")
     emotion_label_zh: str = Field(description="中文情绪标签，如: 治愈/开心/焦虑/疲惫/平静")
     mood_score: int = Field(ge=1, le=10, description="1-10 情绪得分")
+    emotion_intensity: int = Field(default=5, ge=1, le=10, description="主导情绪强度 1-10")
+    confidence: float = Field(default=0.7, ge=0, le=1, description="情绪分类置信度 0-1")
     analysis: str = Field(description="简要心理情绪分析与共情总结")
 
 class CharacterConfig(BaseModel):
     character_name: str = "我"
     appearance_prompt: str = "a young girl with short brown hair, round glasses, wearing an oversized yellow hoodie"
     style_preset: Literal["chibi_manga", "warm_watercolor", "anime_cel", "retro_comic"] = "chibi_manga"
+    visual_identity: Literal["human", "animal"] = "human"
 
 class SpeechBubble(BaseModel):
     text: str = Field(description="对白或心声文字")

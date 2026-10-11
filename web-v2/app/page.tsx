@@ -571,6 +571,7 @@ type StoryPage = {
   mood: string;
   note: string;
   dateLabel: string;
+  dateKey: string;
   cover?: string | null;
   rawTranscript?: string;
   emotionCurve?: Array<{ label: string; intensity: number; evidence: string }>;
@@ -594,6 +595,20 @@ function formatDateLabel(value?: string) {
   return date.toLocaleDateString("zh-CN", { month: "long", day: "numeric" });
 }
 
+function formatDateKey(value?: string) {
+  const date = value ? new Date(value) : new Date();
+  if (Number.isNaN(date.getTime())) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatDateKeyLabel(value: string) {
+  const [, month, day] = value.split("-").map(Number);
+  return month && day ? `${month}月${day}日` : value;
+}
+
 function toStory(diary: {
   title: string;
   companion_note: string;
@@ -611,11 +626,13 @@ function toStory(diary: {
   emotion_curve?: Array<{ label: string; intensity: number; evidence: string }>;
   key_quote?: string | null;
   composite_comic_url?: string | null;
+  entry_date?: string | null;
   created_at: string;
   job_id?: string;
   entry_id?: string;
   raw_transcript?: string;
 }): StoryPage {
+  const storyDate = diary.entry_date || diary.created_at;
   const pages = diary.panels.map((panel, index) => {
       const text = panel.source_excerpt || panel.anchor_text || panel.narration || panel.speech_bubble?.text || diary.companion_note;
       const pageType: "visual" | "graphic_text" = text.length > 30 ? "graphic_text" : "visual";
@@ -636,7 +653,8 @@ function toStory(diary: {
     title: diary.title,
     mood: `${diary.emotion.emotion_label_zh} ${diary.emotion.mood_score * 10}%`,
     note: diary.companion_note,
-    dateLabel: formatDateLabel(diary.created_at),
+    dateLabel: formatDateLabel(storyDate),
+    dateKey: formatDateKey(storyDate),
     cover: mediaUrl(diary.panels[0]?.image_url ?? diary.composite_comic_url),
     rawTranscript: diary.organized_diary || diary.raw_transcript,
     emotionCurve: diary.emotion_curve,
@@ -1230,6 +1248,9 @@ export default function HomePage() {
   const [recordsLoading, setRecordsLoading] = useState(true);
   const [moodFilter, setMoodFilter] = useState<string>("全部");
   const [calendarDateFilter, setCalendarDateFilter] = useState<string | null>(null);
+  const [calendarMonth, setCalendarMonth] = useState(
+    () => new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+  );
   const [showQuickEditor, setShowQuickEditor] = useState(false);
   const [quickNickname, setQuickNickname] = useState(settings.nickname);
   const [quickQuote, setQuickQuote] = useState(settings.quote);
@@ -1291,12 +1312,14 @@ export default function HomePage() {
       // Second, add pure text diary entries that do not have a storybook yet
       for (const entry of entries) {
         if (!usedEntryIds.has(entry.id) && entry.redacted_text?.trim()) {
+          const storyDate = entry.entry_date || entry.created_at;
           mergedList.push({
             entryId: entry.id,
-            title: "文字日记 · " + formatDateLabel(entry.created_at || entry.entry_date),
+            title: "文字日记 · " + formatDateLabel(storyDate),
             mood: entry.emotion?.label || "记录",
-            note: "写于 " + formatDateLabel(entry.created_at || entry.entry_date),
-            dateLabel: formatDateLabel(entry.created_at || entry.entry_date),
+            note: "写于 " + formatDateLabel(storyDate),
+            dateLabel: formatDateLabel(storyDate),
+            dateKey: formatDateKey(storyDate),
             rawTranscript: entry.redacted_text,
             isTextOnly: true,
             pages: [
@@ -1594,12 +1617,14 @@ export default function HomePage() {
       const entry = draftEntryId
         ? await updateTextEntry(draftEntryId, diaryText.trim())
         : await createTextEntry(diaryText.trim());
+      const storyDate = entry.entry_date || entry.created_at;
       const newStory: StoryPage = {
         entryId: entry.id,
-        title: "文字日记 · " + formatDateLabel(entry.created_at || entry.entry_date),
+        title: "文字日记 · " + formatDateLabel(storyDate),
         mood: entry.emotion?.label || "记录",
-        note: "写于 " + formatDateLabel(entry.created_at || entry.entry_date),
-        dateLabel: formatDateLabel(entry.created_at || entry.entry_date),
+        note: "写于 " + formatDateLabel(storyDate),
+        dateLabel: formatDateLabel(storyDate),
+        dateKey: formatDateKey(storyDate),
         rawTranscript: entry.redacted_text,
         isTextOnly: true,
         pages: [
@@ -1904,25 +1929,55 @@ export default function HomePage() {
   }, [records, moodFilter]);
 
   const calendarFilteredRecords = useMemo(() => {
-    if (!calendarDateFilter) return records;
-    return records.filter((r) => r.dateLabel.includes(calendarDateFilter));
-  }, [records, calendarDateFilter]);
+    const monthKey = `${calendarMonth.getFullYear()}-${String(calendarMonth.getMonth() + 1).padStart(2, "0")}`;
+    return records.filter((record) =>
+      calendarDateFilter
+        ? record.dateKey === calendarDateFilter
+        : record.dateKey.startsWith(`${monthKey}-`),
+    );
+  }, [records, calendarDateFilter, calendarMonth]);
+
+  const calendarYearOptions = useMemo(() => {
+    const years = new Set<number>([new Date().getFullYear(), calendarMonth.getFullYear()]);
+    records.forEach((record) => {
+      const year = Number(record.dateKey.slice(0, 4));
+      if (Number.isFinite(year)) years.add(year);
+    });
+    return [...years].sort((a, b) => b - a);
+  }, [records, calendarMonth]);
 
   const currentMonthDays = useMemo(() => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const firstDayIndex = new Date(year, month, 1).getDay();
+    const monthKey = `${year}-${String(month + 1).padStart(2, "0")}`;
     const entryDays = new Set<number>();
     records.forEach((r) => {
-      const match = r.dateLabel.match(/(\d+)日/);
-      if (match) {
-        entryDays.add(Number.parseInt(match[1], 10));
+      const [recordYear, recordMonth, recordDay] = r.dateKey.split("-").map(Number);
+      if (`${recordYear}-${String(recordMonth).padStart(2, "0")}` === monthKey) {
+        entryDays.add(recordDay);
       }
     });
     return { year, month: month + 1, daysInMonth, firstDayIndex, entryDays };
-  }, [records]);
+  }, [records, calendarMonth]);
+
+  const moveCalendarMonth = (offset: number) => {
+    setCalendarMonth((current) =>
+      new Date(current.getFullYear(), current.getMonth() + offset, 1),
+    );
+    setCalendarDateFilter(null);
+  };
+
+  const selectCalendarYear = (year: number) => {
+    setCalendarMonth((current) => new Date(year, current.getMonth(), 1));
+    setCalendarDateFilter(null);
+  };
+
+  const selectCalendarMonth = (month: number) => {
+    setCalendarMonth((current) => new Date(current.getFullYear(), month - 1, 1));
+    setCalendarDateFilter(null);
+  };
 
   const moodBars = useMemo(() => {
     const bars = Array.from({ length: 7 }, () => 28);
@@ -2969,7 +3024,48 @@ export default function HomePage() {
 
           <div className="calendar-card">
             <div className="calendar-header-row">
-              <h3>📅 {currentMonthDays.year} 年 {currentMonthDays.month} 月回忆日历</h3>
+              <div className="calendar-month-navigation">
+                <button
+                  type="button"
+                  className="calendar-month-arrow"
+                  onClick={() => moveCalendarMonth(-1)}
+                  aria-label="查看上个月"
+                  title="上个月"
+                >
+                  <ArrowLeft size={16} />
+                </button>
+                <div className="calendar-period-picker" aria-label="选择日历年月">
+                  <span aria-hidden="true">📅</span>
+                  <select
+                    aria-label="选择年份"
+                    value={currentMonthDays.year}
+                    onChange={(event) => selectCalendarYear(Number(event.target.value))}
+                  >
+                    {calendarYearOptions.map((year) => (
+                      <option key={year} value={year}>{year} 年</option>
+                    ))}
+                  </select>
+                  <select
+                    aria-label="选择月份"
+                    value={currentMonthDays.month}
+                    onChange={(event) => selectCalendarMonth(Number(event.target.value))}
+                  >
+                    {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => (
+                      <option key={month} value={month}>{month} 月</option>
+                    ))}
+                  </select>
+                  <strong>回忆日历</strong>
+                </div>
+                <button
+                  type="button"
+                  className="calendar-month-arrow"
+                  onClick={() => moveCalendarMonth(1)}
+                  aria-label="查看下个月"
+                  title="下个月"
+                >
+                  <ArrowRight size={16} />
+                </button>
+              </div>
               {calendarDateFilter ? (
                 <button
                   className="clear-filter-btn"
@@ -2990,16 +3086,16 @@ export default function HomePage() {
               ))}
               {Array.from({ length: currentMonthDays.daysInMonth }).map((_, i) => {
                 const dayNum = i + 1;
-                const dayLabel = `${currentMonthDays.month}月${dayNum}日`;
+                const dayKey = `${currentMonthDays.year}-${String(currentMonthDays.month).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
                 const hasEntry = currentMonthDays.entryDays.has(dayNum);
-                const isSelected = calendarDateFilter === `${dayNum}日` || calendarDateFilter === dayLabel;
+                const isSelected = calendarDateFilter === dayKey;
                 return (
                   <button
                     key={dayNum}
                     className={`calendar-cell ${hasEntry ? "has-entry" : ""} ${isSelected ? "selected" : ""}`}
                     onClick={() => {
                       if (isSelected) setCalendarDateFilter(null);
-                      else setCalendarDateFilter(`${dayNum}日`);
+                      else setCalendarDateFilter(dayKey);
                     }}
                     title={hasEntry ? `${dayNum}日有日记回忆` : `${dayNum}日`}
                     aria-label={`${currentMonthDays.month}月${dayNum}日${hasEntry ? "，有日记记录" : ""}`}
@@ -3012,7 +3108,7 @@ export default function HomePage() {
             </div>
             {calendarDateFilter ? (
               <div className="calendar-active-filter-bar">
-                <span>正在查看：<strong>{calendarDateFilter}</strong> 的回忆 ({calendarFilteredRecords.length} 篇)</span>
+                <span>正在查看：<strong>{formatDateKeyLabel(calendarDateFilter)}</strong> 的回忆 ({calendarFilteredRecords.length} 篇)</span>
                 <button className="clear-filter-btn" onClick={() => setCalendarDateFilter(null)}>
                   ✕ 清除筛选
                 </button>
@@ -3025,7 +3121,7 @@ export default function HomePage() {
               <article className="record-card empty-state-card">
                 <VoonieDog pose="look" />
                 <div className="record-content" style={{ textAlign: "center", marginTop: "12px" }}>
-                  <h3>{calendarDateFilter ? `${calendarDateFilter} 暂无回忆` : "日历还是空的"}</h3>
+                  <h3>{calendarDateFilter ? `${formatDateKeyLabel(calendarDateFilter)} 暂无回忆` : `${currentMonthDays.year}年${currentMonthDays.month}月暂无回忆`}</h3>
                   <p>
                     {calendarDateFilter
                       ? "当天还没有记录绘本，点击下方按钮写一篇吧。"

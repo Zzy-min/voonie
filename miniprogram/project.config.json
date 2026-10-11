@@ -48,6 +48,10 @@
   "srcMiniprogramRoot": "./",
   "packOptions": {
     "ignore": [
+      { "type": "folder", "value": "pages/storage" },
+      { "type": "folder", "value": "pages/local-book" },
+      { "type": "folder", "value": "pages/share" },
+      { "type": "folder", "value": "pages/square" },
       {
         "type": "folder",
         "value": "qa-evidence"

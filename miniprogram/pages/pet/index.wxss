@@ -28,3 +28,4 @@
 .chat-placeholder { color: #A89789; }
 .send-button { width: 92rpx; height: 72rpx; flex: none; border-radius: 20rpx; background: #EEE3D5; color: #A89789; font-size: 25rpx; line-height: 72rpx; text-align: center; }
 .send-button.active { background: #E8A74C; color: #3E3026; }
+.message-retry { margin-top: 14rpx; font-size: 24rpx; color: #9D513A; text-decoration: underline; }
